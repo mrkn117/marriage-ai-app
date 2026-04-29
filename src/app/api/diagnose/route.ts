@@ -1,0 +1,97 @@
+import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
+import { buildDiagnosisSystemPrompt, buildDiagnosisUserPrompt } from '@/prompts/diagnosis';
+import { saveDiagnosisResult } from '@/lib/firestore';
+import type { DiagnoseRequest, DiagnosisResult, DiagnosisScores } from '@/types';
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+export async function POST(req: NextRequest) {
+  try {
+    const body: DiagnoseRequest = await req.json();
+    const { userProfile, imageUrls, currentDate } = body;
+
+    if (!imageUrls || imageUrls.length === 0) {
+      return NextResponse.json({ error: '画像が必要です' }, { status: 400 });
+    }
+    if (!userProfile) {
+      return NextResponse.json({ error: 'プロフィールが必要です' }, { status: 400 });
+    }
+
+    // Build vision messages with image URLs
+    const imageMessages = imageUrls.map((url) => ({
+      type: 'image_url' as const,
+      image_url: { url, detail: 'high' as const },
+    }));
+
+    const userText = buildDiagnosisUserPrompt(userProfile, imageUrls, currentDate);
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: buildDiagnosisSystemPrompt(),
+        },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: userText },
+            ...imageMessages,
+          ],
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 2000,
+    });
+
+    const content = completion.choices[0]?.message?.content ?? '';
+
+    // Extract JSON from response
+    const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) ??
+                      content.match(/\{[\s\S]*"scores"[\s\S]*\}/);
+
+    if (!jsonMatch) {
+      throw new Error('AI response parsing failed');
+    }
+
+    const jsonStr = jsonMatch[1] ?? jsonMatch[0];
+    const parsed = JSON.parse(jsonStr);
+
+    // Validate and normalize scores
+    const scores: DiagnosisScores = {
+      firstImpression: Math.min(20, Math.max(0, parsed.scores?.firstImpression ?? 10)),
+      cleanliness: Math.min(15, Math.max(0, parsed.scores?.cleanliness ?? 8)),
+      expression: Math.min(15, Math.max(0, parsed.scores?.expression ?? 8)),
+      postureAndBody: Math.min(20, Math.max(0, parsed.scores?.postureAndBody ?? 10)),
+      profileBalance: Math.min(15, Math.max(0, parsed.scores?.profileBalance ?? 8)),
+      marketValue: Math.min(15, Math.max(0, parsed.scores?.marketValue ?? 8)),
+      total: 0,
+    };
+    scores.total = Object.values(scores).reduce((a, b) => a + b, 0) - scores.total;
+
+    const diagnosisData: Omit<DiagnosisResult, 'id'> = {
+      userId: userProfile.uid,
+      scores,
+      harshEvaluation: parsed.harshEvaluation ?? '',
+      strengths: parsed.strengths ?? '',
+      weaknesses: parsed.weaknesses ?? '',
+      marketView: parsed.marketView ?? '',
+      improvementPriority: Array.isArray(parsed.improvementPriority) ? parsed.improvementPriority : [],
+      thisWeekAction: parsed.thisWeekAction ?? '',
+      oneMonthAction: parsed.oneMonthAction ?? '',
+      createdAt: new Date(),
+      imageUrls,
+    };
+
+    const id = await saveDiagnosisResult(diagnosisData);
+
+    return NextResponse.json({ id, ...diagnosisData });
+  } catch (err: any) {
+    console.error('Diagnosis error:', err);
+    return NextResponse.json(
+      { error: err.message ?? '診断に失敗しました' },
+      { status: 500 }
+    );
+  }
+}
