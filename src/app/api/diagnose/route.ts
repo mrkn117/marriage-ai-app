@@ -4,119 +4,170 @@ import { buildDiagnosisSystemPrompt, buildDiagnosisUserPrompt } from '@/prompts/
 import { saveDiagnosisResult } from '@/lib/firestore';
 import type { DiagnoseRequest, DiagnosisResult, DiagnosisScores } from '@/types';
 
+// OpenAI accepts only these image formats
+const SUPPORTED_PREFIXES = [
+  'data:image/jpeg;base64,',
+  'data:image/jpg;base64,',
+  'data:image/png;base64,',
+  'data:image/gif;base64,',
+  'data:image/webp;base64,',
+];
+
+// Remove whitespace from base64 data (some browsers/iOS may add line breaks)
+function sanitizeDataUrl(url: string): string {
+  if (!url.startsWith('data:image/')) return url;
+  const commaIdx = url.indexOf(',');
+  if (commaIdx === -1) return url;
+  const header = url.slice(0, commaIdx + 1);
+  const data = url.slice(commaIdx + 1).replace(/\s+/g, '');
+  return header + data;
+}
+
+function isOpenAICompatible(url: string): boolean {
+  if (url.startsWith('https://')) return true;
+  return SUPPORTED_PREFIXES.some((p) => url.startsWith(p));
+}
+
+function parseJson(content: string): any {
+  // Strategy 1: direct parse
+  try { return JSON.parse(content); } catch { /* next */ }
+  // Strategy 2: ```json block
+  const m2 = content.match(/```json\s*([\s\S]*?)\s*```/);
+  if (m2) try { return JSON.parse(m2[1]); } catch { /* next */ }
+  // Strategy 3: any ``` block
+  const m3 = content.match(/```\s*([\s\S]*?)\s*```/);
+  if (m3) try { return JSON.parse(m3[1]); } catch { /* next */ }
+  // Strategy 4: outermost { }
+  const start = content.indexOf('{');
+  const end = content.lastIndexOf('}');
+  if (start !== -1 && end > start) {
+    try { return JSON.parse(content.slice(start, end + 1)); } catch { /* next */ }
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+  // Step 1: Parse request
+  let body: DiagnoseRequest;
   try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const body: DiagnoseRequest = await req.json();
-    const { userProfile, imageUrls, currentDate } = body;
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'リクエスト解析失敗' }, { status: 400 });
+  }
 
-    if (!imageUrls || imageUrls.length === 0) {
-      return NextResponse.json({ error: '画像が必要です' }, { status: 400 });
-    }
-    if (!userProfile) {
-      return NextResponse.json({ error: 'プロフィールが必要です' }, { status: 400 });
-    }
-    // Ensure all image URLs are valid data URLs or https URLs
-    const validImageUrls = imageUrls.filter(
-      (url) => url.startsWith('data:image/') || url.startsWith('https://')
+  const { userProfile, imageUrls, currentDate } = body;
+
+  if (!imageUrls?.length) {
+    return NextResponse.json({ error: '画像が必要です' }, { status: 400 });
+  }
+  if (!userProfile) {
+    return NextResponse.json({ error: 'プロフィールが必要です' }, { status: 400 });
+  }
+
+  // Step 2: Sanitize and validate image URLs
+  const validUrls = imageUrls
+    .map(sanitizeDataUrl)
+    .filter(isOpenAICompatible);
+
+  if (validUrls.length === 0) {
+    return NextResponse.json(
+      { error: '対応していない画像形式です（JPEG/PNG/WebPで撮影してください）' },
+      { status: 400 }
     );
-    if (validImageUrls.length === 0) {
-      return NextResponse.json({ error: '有効な画像がありません' }, { status: 400 });
-    }
+  }
 
-    // Build vision messages with image URLs
-    const imageMessages = validImageUrls.map((url) => ({
-      type: 'image_url' as const,
-      image_url: { url, detail: 'high' as const },
-    }));
-
-    const userText = buildDiagnosisUserPrompt(userProfile, validImageUrls, currentDate);
-
-    const completion = await openai.chat.completions.create({
+  // Step 3: Call OpenAI
+  let completion;
+  try {
+    completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        {
-          role: 'system',
-          content: buildDiagnosisSystemPrompt(),
-        },
+        { role: 'system', content: buildDiagnosisSystemPrompt() },
         {
           role: 'user',
           content: [
-            { type: 'text', text: userText },
-            ...imageMessages,
+            { type: 'text', text: buildDiagnosisUserPrompt(userProfile, validUrls, currentDate) },
+            ...validUrls.map((url) => ({
+              type: 'image_url' as const,
+              image_url: { url, detail: 'auto' as const },
+            })),
           ],
         },
       ],
       temperature: 0.7,
       max_tokens: 2000,
     });
-
-    const content = completion.choices[0]?.message?.content ?? '';
-
-    // Try multiple parsing strategies
-    let parsed: any;
-    try {
-      // 1. Direct JSON parse
-      parsed = JSON.parse(content);
-    } catch {
-      // 2. Extract from ```json block
-      const codeBlock = content.match(/```json\s*([\s\S]*?)\s*```/);
-      if (codeBlock) {
-        try { parsed = JSON.parse(codeBlock[1]); } catch { /* continue */ }
-      }
-      // 3. Extract first {...} block containing "scores"
-      if (!parsed) {
-        const jsonBlock = content.match(/\{[\s\S]*?"scores"[\s\S]*?\}(?=\s*$|\s*```)/);
-        if (jsonBlock) {
-          try { parsed = JSON.parse(jsonBlock[0]); } catch { /* continue */ }
-        }
-      }
-      // 4. Find outermost { } pair
-      if (!parsed) {
-        const start = content.indexOf('{');
-        const end = content.lastIndexOf('}');
-        if (start !== -1 && end > start) {
-          try { parsed = JSON.parse(content.slice(start, end + 1)); } catch { /* continue */ }
-        }
-      }
-      if (!parsed) throw new Error('AI response parsing failed');
-    }
-
-    // Validate and normalize scores
-    const scores: DiagnosisScores = {
-      firstImpression: Math.min(20, Math.max(0, parsed.scores?.firstImpression ?? 10)),
-      cleanliness: Math.min(15, Math.max(0, parsed.scores?.cleanliness ?? 8)),
-      expression: Math.min(15, Math.max(0, parsed.scores?.expression ?? 8)),
-      postureAndBody: Math.min(20, Math.max(0, parsed.scores?.postureAndBody ?? 10)),
-      profileBalance: Math.min(15, Math.max(0, parsed.scores?.profileBalance ?? 8)),
-      marketValue: Math.min(15, Math.max(0, parsed.scores?.marketValue ?? 8)),
-      total: 0,
-    };
-    scores.total = Object.values(scores).reduce((a, b) => a + b, 0) - scores.total;
-
-    const diagnosisData: Omit<DiagnosisResult, 'id'> = {
-      userId: userProfile.uid,
-      scores,
-      harshEvaluation: parsed.harshEvaluation ?? '',
-      strengths: parsed.strengths ?? '',
-      weaknesses: parsed.weaknesses ?? '',
-      marketView: parsed.marketView ?? '',
-      improvementPriority: Array.isArray(parsed.improvementPriority) ? parsed.improvementPriority : [],
-      thisWeekAction: parsed.thisWeekAction ?? '',
-      oneMonthAction: parsed.oneMonthAction ?? '',
-      createdAt: new Date(),
-      imageUrls: [],  // base64 URLs are too large for Firestore; store empty
-    };
-
-    const id = await saveDiagnosisResult(diagnosisData);
-
-    // Return imageUrls in response (for in-memory display) but don't persist base64 to Firestore
-    return NextResponse.json({ id, ...diagnosisData, imageUrls: validImageUrls });
   } catch (err: any) {
-    console.error('Diagnosis error:', err);
+    console.error('[diagnose] OpenAI error:', err?.message, err?.status);
+    const msg = err?.message ?? 'OpenAI APIエラー';
+    return NextResponse.json({ error: `AI呼び出し失敗: ${msg}` }, { status: 500 });
+  }
+
+  const choice = completion.choices[0];
+  const content = choice?.message?.content ?? '';
+  const finishReason = choice?.finish_reason;
+
+  // Step 4: Handle content filter / empty response
+  if (finishReason === 'content_filter' || !content.trim()) {
     return NextResponse.json(
-      { error: err.message ?? '診断に失敗しました' },
+      { error: '写真の内容をAIが処理できませんでした。本人のみが写った写真をお使いください。' },
+      { status: 422 }
+    );
+  }
+
+  // Step 5: Parse JSON
+  const parsed = parseJson(content);
+  if (!parsed) {
+    console.error('[diagnose] Parse failed. Raw content:', content.slice(0, 300));
+    return NextResponse.json(
+      { error: 'AIの返答を解析できませんでした。もう一度お試しください。' },
       { status: 500 }
     );
   }
+
+  // Step 6: Build and normalize scores
+  const scores: DiagnosisScores = {
+    firstImpression: Math.min(20, Math.max(0, Number(parsed.scores?.firstImpression) || 10)),
+    cleanliness:     Math.min(15, Math.max(0, Number(parsed.scores?.cleanliness)     || 8)),
+    expression:      Math.min(15, Math.max(0, Number(parsed.scores?.expression)      || 8)),
+    postureAndBody:  Math.min(20, Math.max(0, Number(parsed.scores?.postureAndBody)  || 10)),
+    profileBalance:  Math.min(15, Math.max(0, Number(parsed.scores?.profileBalance)  || 8)),
+    marketValue:     Math.min(15, Math.max(0, Number(parsed.scores?.marketValue)     || 8)),
+    total: 0,
+  };
+  scores.total =
+    scores.firstImpression + scores.cleanliness + scores.expression +
+    scores.postureAndBody + scores.profileBalance + scores.marketValue;
+
+  const diagnosisData: Omit<DiagnosisResult, 'id'> = {
+    userId: userProfile.uid ?? '',
+    scores,
+    harshEvaluation: String(parsed.harshEvaluation ?? ''),
+    strengths:       String(parsed.strengths       ?? ''),
+    weaknesses:      String(parsed.weaknesses      ?? ''),
+    marketView:      String(parsed.marketView      ?? ''),
+    improvementPriority: Array.isArray(parsed.improvementPriority)
+      ? parsed.improvementPriority.map(String)
+      : [],
+    thisWeekAction:  String(parsed.thisWeekAction  ?? ''),
+    oneMonthAction:  String(parsed.oneMonthAction  ?? ''),
+    createdAt: new Date(),
+    imageUrls: [],
+  };
+
+  // Step 7: Save to Firestore
+  let id: string;
+  try {
+    id = await saveDiagnosisResult(diagnosisData);
+  } catch (err: any) {
+    console.error('[diagnose] Firestore error:', err?.message);
+    return NextResponse.json(
+      { error: `データ保存失敗: ${err?.message ?? 'Firestoreエラー'}` },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ id, ...diagnosisData, imageUrls: validUrls });
 }
