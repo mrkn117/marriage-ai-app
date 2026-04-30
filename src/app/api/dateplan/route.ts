@@ -28,15 +28,19 @@ export async function POST(req: NextRequest) {
       ],
       temperature: 0.8,
       max_tokens: 3000,
+      response_format: { type: 'json_object' },
     });
 
     const content = completion.choices[0]?.message?.content ?? '';
-    const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) ??
-                      content.match(/\{[\s\S]*"planName"[\s\S]*\}/);
-
-    if (!jsonMatch) throw new Error('Date plan response parsing failed');
-
-    const parsed = JSON.parse(jsonMatch[1] ?? jsonMatch[0]);
+    let parsed: any;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) ??
+                        content.match(/\{[\s\S]*"planName"[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('Date plan response parsing failed');
+      parsed = JSON.parse(jsonMatch[1] ?? jsonMatch[0]);
+    }
 
     const data: Omit<DatePlan, 'id'> = {
       userId: userProfile.uid,

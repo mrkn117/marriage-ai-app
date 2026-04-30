@@ -49,20 +49,21 @@ export async function POST(req: NextRequest) {
       ],
       temperature: 0.7,
       max_tokens: 2000,
+      response_format: { type: 'json_object' },
     });
 
     const content = completion.choices[0]?.message?.content ?? '';
 
-    // Extract JSON from response
-    const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) ??
-                      content.match(/\{[\s\S]*"scores"[\s\S]*\}/);
-
-    if (!jsonMatch) {
-      throw new Error('AI response parsing failed');
+    let parsed: any;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      // fallback: extract JSON block if present
+      const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) ??
+                        content.match(/\{[\s\S]*"scores"[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('AI response parsing failed');
+      parsed = JSON.parse(jsonMatch[1] ?? jsonMatch[0]);
     }
-
-    const jsonStr = jsonMatch[1] ?? jsonMatch[0];
-    const parsed = JSON.parse(jsonStr);
 
     // Validate and normalize scores
     const scores: DiagnosisScores = {
