@@ -7,6 +7,9 @@ import type { DiagnoseRequest, DiagnosisResult, DiagnosisScores } from '@/types'
 // We use dynamic import inside the handler so that Firebase initialization
 // errors (which happen at module-load time) are caught in try-catch.
 
+// Vercel Hobby plan hard cap is 60 s — set explicitly so Next.js doesn't apply a lower default
+export const maxDuration = 60;
+
 const SUPPORTED_PREFIXES = [
   'data:image/jpeg;base64,',
   'data:image/jpg;base64,',
@@ -83,9 +86,15 @@ async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
   }
 
   // ── 3. Call OpenAI Vision API ─────────────────────────────────────
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json({ error: 'OpenAI APIキーが設定されていません（環境変数未設定）' }, { status: 500 });
+  }
   let completion;
   try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      timeout: 55_000, // must finish before Vercel's 60 s function kill
+    });
     completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
@@ -105,12 +114,14 @@ async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
         },
       ],
       temperature: 0.7,
-      max_tokens: 2000,
+      max_tokens: 1500,
     });
   } catch (err: any) {
     console.error('[diagnose] OpenAI error:', err?.message, err?.status);
+    const msg = err?.message ?? 'OpenAI APIエラー';
+    const isTimeout = msg.includes('timeout') || msg.includes('timed out') || err?.status === 408;
     return NextResponse.json(
-      { error: `AI呼び出し失敗: ${err?.message ?? 'OpenAI APIエラー'}` },
+      { error: isTimeout ? 'AIの応答がタイムアウトしました。再度お試しください。' : `AI呼び出し失敗: ${msg}` },
       { status: 500 }
     );
   }
@@ -167,12 +178,17 @@ async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
     imageUrls: [],
   };
 
-  // ── 7. Save to Firestore (non-fatal) ──────────────────────────────
+  // ── 7. Save to Firestore (non-fatal, 5 s timeout) ─────────────────
   // Dynamic import so Firebase init errors don't crash the whole route.
   let id = `local_${Date.now()}`;
   try {
     const { saveDiagnosisResult } = await import('@/lib/firestore');
-    id = await saveDiagnosisResult(diagnosisData);
+    id = await Promise.race([
+      saveDiagnosisResult(diagnosisData),
+      new Promise<string>((_, reject) =>
+        setTimeout(() => reject(new Error('Firestore timeout')), 5000)
+      ),
+    ]);
   } catch (err: any) {
     // Firestore failure is logged but does NOT block the diagnosis result.
     console.error('[diagnose] Firestore save failed (non-fatal):', err?.message);

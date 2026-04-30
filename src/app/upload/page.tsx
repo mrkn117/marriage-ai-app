@@ -109,6 +109,8 @@ export default function UploadPage() {
     }
 
     setDiagnosing(true);
+    const controller = new AbortController();
+    const abortTimer = setTimeout(() => controller.abort(), 62_000); // client-side safety net
     try {
       const imageUrls = Object.values(slots)
         .filter((s) => s?.uploaded && s.url)
@@ -142,18 +144,30 @@ export default function UploadPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: bodyStr,
+          signal: controller.signal,
         });
       } catch (fetchErr: any) {
+        if ((fetchErr as any)?.name === 'AbortError') {
+          throw new Error('AI分析がタイムアウトしました。しばらく後に再試行してください。');
+        }
         const msg = fetchErr?.message ?? String(fetchErr);
         throw new Error(`通信エラーが発生しました。ネットワークを確認してください。（${msg}）`);
       }
 
       if (!response.ok) {
-        let errMsg = '診断に失敗しました';
-        try {
-          const errJson = await response.json();
-          errMsg = errJson.error || errMsg;
-        } catch { /* ignore json parse error */ }
+        const status = response.status;
+        let errMsg: string;
+        if (status === 504 || status === 524 || status === 408) {
+          errMsg = 'AI分析がタイムアウトしました。しばらく後に再試行してください。';
+        } else {
+          errMsg = `診断に失敗しました（HTTP ${status}）`;
+          try {
+            const errJson = await response.json();
+            if (errJson?.error) errMsg = errJson.error;
+          } catch {
+            // Server returned non-JSON (e.g., Vercel HTML error page)
+          }
+        }
         throw new Error(errMsg);
       }
 
@@ -183,6 +197,7 @@ export default function UploadPage() {
     } catch (err: any) {
       toast.error(err.message || '診断に失敗しました。もう一度お試しください');
     } finally {
+      clearTimeout(abortTimer);
       setDiagnosing(false);
     }
   };
