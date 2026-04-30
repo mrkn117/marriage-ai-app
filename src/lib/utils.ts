@@ -7,9 +7,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatDate(date: Date | string, fmt = 'yyyy年MM月dd日'): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return format(d, fmt, { locale: ja });
+export function formatDate(date: Date | string | null | undefined, fmt = 'yyyy年MM月dd日'): string {
+  if (!date) return '';
+  try {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(d.getTime())) return '';
+    return format(d, fmt, { locale: ja });
+  } catch {
+    return '';
+  }
 }
 
 export function getSeason(month: number): string {
@@ -35,11 +41,15 @@ export function estimateTemperature(month: number): number {
 }
 
 export function getBMI(height: number, weight: number): number {
+  if (!height || !weight || height <= 0) return 0;
   const h = height / 100;
-  return Math.round((weight / (h * h)) * 10) / 10;
+  const bmi = weight / (h * h);
+  if (!isFinite(bmi)) return 0;
+  return Math.round(bmi * 10) / 10;
 }
 
 export function getBMICategory(bmi: number): string {
+  if (!bmi || bmi <= 0) return '不明';
   if (bmi < 18.5) return '痩せ型';
   if (bmi < 25) return '標準';
   if (bmi < 30) return 'やや肥満';

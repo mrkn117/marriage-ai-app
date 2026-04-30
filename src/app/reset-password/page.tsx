@@ -32,8 +32,17 @@ export default function ResetPasswordPage() {
       await resetPassword(data.email);
       setSent(true);
       toast.success('パスワードリセットメールを送信しました');
-    } catch (err) {
-      toast.error('送信に失敗しました。メールアドレスを確認してください');
+    } catch (err: any) {
+      const code = err?.code ?? '';
+      const msg =
+        code === 'auth/user-not-found' || code === 'auth/invalid-email'
+          ? 'このメールアドレスは登録されていません'
+          : code === 'auth/too-many-requests'
+          ? 'リクエストが多すぎます。しばらく時間をおいてください'
+          : code === 'auth/network-request-failed'
+          ? 'ネットワークエラーが発生しました'
+          : '送信に失敗しました。メールアドレスを確認してください';
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

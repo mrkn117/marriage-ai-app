@@ -26,7 +26,11 @@ function compressImage(file: File, maxPx = 512, quality = 0.75): Promise<string>
       const canvas = document.createElement('canvas');
       canvas.width  = Math.round(w * scale);
       canvas.height = Math.round(h * scale);
-      const ctx = canvas.getContext('2d')!;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('画像処理に失敗しました（Canvas未対応）'));
+        return;
+      }
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
       // Produce JPEG; strip whitespace from base64 payload

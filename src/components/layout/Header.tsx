@@ -34,8 +34,12 @@ export function Header() {
   const [profileOpen, setProfileOpen] = useState(false);
 
   const handleLogout = async () => {
-    await logout();
-    router.push('/');
+    try {
+      await logout();
+      router.push('/');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
   };
 
   if (!user) return null;

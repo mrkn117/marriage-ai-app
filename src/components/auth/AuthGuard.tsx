@@ -10,6 +10,20 @@ interface AuthGuardProps {
   requireProfile?: boolean;
 }
 
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen bg-dark-900 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="relative">
+          <div className="w-16 h-16 rounded-full border-2 border-primary-500/20"></div>
+          <Loader2 className="w-16 h-16 text-primary-500 animate-spin absolute inset-0" />
+        </div>
+        <p className="text-white/40 text-sm">読み込み中...</p>
+      </div>
+    </div>
+  );
+}
+
 export function AuthGuard({ children, requireProfile = false }: AuthGuardProps) {
   const { user, userProfile, loading } = useAuth();
   const router = useRouter();
@@ -21,21 +35,10 @@ export function AuthGuard({ children, requireProfile = false }: AuthGuardProps) 
     }
   }, [user, userProfile, loading, router, requireProfile]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-dark-900 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="w-16 h-16 rounded-full border-2 border-primary-500/20"></div>
-            <Loader2 className="w-16 h-16 text-primary-500 animate-spin absolute inset-0" />
-          </div>
-          <p className="text-white/40 text-sm">読み込み中...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen />;
 
-  if (requireProfile && !userProfile?.age) return null;
+  // Show loading during redirect instead of blank screen
+  if (requireProfile && (!userProfile?.age)) return <LoadingScreen />;
 
   return <>{children}</>;
 }

@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from '@/context/AuthContext';
 import { DiagnosisProvider } from '@/context/DiagnosisContext';
 import { Header } from '@/components/layout/Header';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-dark-900 min-h-screen">
         <AuthProvider>
           <DiagnosisProvider>
+            <ErrorBoundary>
             <Header />
             <main>{children}</main>
             <Toaster
@@ -41,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 },
               }}
             />
+            </ErrorBoundary>
           </DiagnosisProvider>
         </AuthProvider>
       </body>

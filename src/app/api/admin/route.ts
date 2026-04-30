@@ -1,18 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllUsers, getAllDiagnoses } from '@/lib/firestore';
 
 export async function GET(req: NextRequest) {
   const adminEmail = process.env.ADMIN_EMAIL;
   const authHeader = req.headers.get('x-admin-email');
 
-  if (!authHeader || authHeader !== adminEmail) {
+  if (!adminEmail || !authHeader || authHeader !== adminEmail) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const [users, diagnoses] = await Promise.all([getAllUsers(), getAllDiagnoses()]);
+    const { getAllUsers, getAllDiagnoses } = await import('@/lib/firestore');
+
+    const [users, diagnoses] = await Promise.race([
+      Promise.all([getAllUsers(), getAllDiagnoses()]),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Firestore timeout')), 15_000)
+      ),
+    ]);
+
     return NextResponse.json({ users, diagnoses });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[admin] Error:', err?.message);
+    const isTimeout = err?.message?.includes('timeout');
+    return NextResponse.json(
+      { error: isTimeout ? 'データ取得がタイムアウトしました' : err.message ?? 'サーバーエラー' },
+      { status: 500 }
+    );
   }
 }

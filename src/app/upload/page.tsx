@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { motion } from 'framer-motion';
@@ -20,7 +20,7 @@ import { AuthGuard } from '@/components/auth/AuthGuard';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { uploadImage } from '@/lib/storage';
-import { cn, fileToBase64 } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import type { UploadedImage } from '@/types';
 import type { ImageType } from '@/lib/storage';
@@ -51,6 +51,17 @@ export default function UploadPage() {
   const [slots, setSlots] = useState<Partial<Record<ImageType, SlotFile>>>({});
   const [diagnosing, setDiagnosing] = useState(false);
   const [activeSlot, setActiveSlot] = useState<ImageType | null>(null);
+  const slotsRef = useRef(slots);
+  slotsRef.current = slots;
+
+  // Revoke all ObjectURLs on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      Object.values(slotsRef.current).forEach((s) => {
+        if (s?.preview) URL.revokeObjectURL(s.preview);
+      });
+    };
+  }, []);
 
   const onDrop = useCallback(
     async (acceptedFiles: File[], type: ImageType) => {
@@ -312,6 +323,15 @@ interface DropZoneSlotProps {
 function DropZoneSlot({ slot, slotData, onDrop, onRemove }: DropZoneSlotProps) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    onDropRejected: (rejections) => {
+      const first = rejections[0];
+      if (!first) return;
+      const isTooLarge = first.errors.some((e) => e.code === 'file-too-large');
+      const isWrongType = first.errors.some((e) => e.code === 'file-invalid-type');
+      if (isTooLarge) toast.error('ファイルサイズが大きすぎます（上限10MB）');
+      else if (isWrongType) toast.error('JPEG・PNG・WebP形式の画像を選択してください');
+      else toast.error('この画像は使用できません');
+    },
     accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.heic'] },
     maxFiles: 1,
     maxSize: 10 * 1024 * 1024,

@@ -55,10 +55,12 @@ function DiagnosisContent() {
       }
       if (diagnosisId) {
         try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 10_000);
-          const r = await getDiagnosisResult(diagnosisId);
-          clearTimeout(timer);
+          const r = await Promise.race([
+            getDiagnosisResult(diagnosisId),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('Firestore timeout')), 10_000)
+            ),
+          ]);
           setResult(r);
         } catch (e: any) {
           console.error('Failed to load diagnosis:', e);
