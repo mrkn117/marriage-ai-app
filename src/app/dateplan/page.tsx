@@ -66,7 +66,7 @@ export default function DatePlanPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userProfile: { ...userProfile, uid: user!.uid },
+            userProfile: { ...userProfile, uid: user?.uid ?? '' },
             area,
             budget: Number(budget),
             timeSlot,

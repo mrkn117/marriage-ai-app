@@ -39,7 +39,7 @@ export default function ProfileGenPage() {
         response = await fetch('/api/profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userProfile: { ...userProfile, uid: user!.uid } }),
+          body: JSON.stringify({ userProfile: { ...userProfile, uid: user?.uid ?? '' } }),
           signal: controller.signal,
         });
       } catch (fetchErr: any) {

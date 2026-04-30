@@ -100,7 +100,7 @@ export default function FashionPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userProfile: { ...userProfile, uid: user!.uid },
+            userProfile: { ...userProfile, uid: user?.uid ?? '' },
             currentDate: now.toISOString().split('T')[0],
             season,
             temperature: Number(temperature),

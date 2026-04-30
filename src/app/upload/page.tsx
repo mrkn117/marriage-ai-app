@@ -6,13 +6,14 @@ import { useDropzone } from 'react-dropzone';
 import { motion } from 'framer-motion';
 import {
   Camera,
-  Upload,
   X,
   CheckCircle,
   AlertCircle,
   Loader2,
   ArrowRight,
   Info,
+  AlertTriangle,
+  XCircle,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useDiagnosis } from '@/context/DiagnosisContext';
@@ -26,13 +27,31 @@ import type { UploadedImage } from '@/types';
 import type { ImageType } from '@/lib/storage';
 
 const imageSlots: { type: ImageType; label: string; desc: string; required: boolean }[] = [
-  { type: 'face', label: '顔写真', desc: '正面・明るい場所', required: true },
-  { type: 'full-body', label: '全身（正面）', desc: '頭から足まで', required: true },
-  { type: 'side', label: '全身（横）', desc: '横からの全身', required: false },
-  { type: 'back', label: '後ろ姿', desc: '後ろからの全身', required: false },
-  { type: 'angle', label: '斜め', desc: '斜め前からの写真', required: false },
-  { type: 'expression', label: '表情違い', desc: '笑顔・自然な表情', required: false },
+  { type: 'face',       label: '顔写真',     desc: '正面・明るい場所',   required: true  },
+  { type: 'full-body',  label: '全身（正面）', desc: '頭から足まで',       required: true  },
+  { type: 'side',       label: '全身（横）',   desc: '横からの全身',       required: false },
+  { type: 'back',       label: '後ろ姿',       desc: '後ろからの全身',     required: false },
+  { type: 'angle',      label: '斜め',         desc: '斜め前からの写真',   required: false },
+  { type: 'expression', label: '表情違い',     desc: '笑顔・自然な表情',   required: false },
 ];
+
+const photoRules = {
+  ng: [
+    '複数人が写っている（本人のみにしてください）',
+    'サングラス・マスク・帽子で顔が隠れている',
+    '加工・フィルター使用（美肌・目拡大など）',
+    '暗所・逆光・ピンボケ写真',
+    '集合写真・遠景（顔が小さすぎる）',
+    'スクリーンショットや画面を再撮影したもの',
+  ],
+  ok: [
+    '自然光など明るい場所で撮影',
+    '顔が鮮明に写っている（正面推奨）',
+    '全身は頭から足まで入っている',
+    '加工なし・ありのままの状態',
+    'JPEG・PNG・WebP形式（10MB以下）',
+  ],
+};
 
 interface SlotFile {
   type: ImageType;
@@ -50,7 +69,6 @@ export default function UploadPage() {
   const router = useRouter();
   const [slots, setSlots] = useState<Partial<Record<ImageType, SlotFile>>>({});
   const [diagnosing, setDiagnosing] = useState(false);
-  const [activeSlot, setActiveSlot] = useState<ImageType | null>(null);
   const slotsRef = useRef(slots);
   slotsRef.current = slots;
 
@@ -68,27 +86,33 @@ export default function UploadPage() {
       const file = acceptedFiles[0];
       if (!file) return;
 
-      const preview = URL.createObjectURL(file);
+      let preview: string;
+      try {
+        preview = URL.createObjectURL(file);
+      } catch {
+        toast.error('画像ファイルの読み込みに失敗しました');
+        return;
+      }
+
       setSlots((prev) => ({
         ...prev,
         [type]: { type, file, preview, uploading: true, uploaded: false },
       }));
 
       try {
-        const url = await uploadImage(file, user!.uid, type, (progress) => {
-          // Progress tracking if needed
-        });
+        const url = await uploadImage(file, user?.uid ?? '', type);
         setSlots((prev) => ({
           ...prev,
           [type]: { ...prev[type]!, uploading: false, uploaded: true, url },
         }));
         toast.success(`${imageSlots.find((s) => s.type === type)?.label}をアップロードしました`);
-      } catch (err) {
+      } catch (err: any) {
+        const msg = err?.message ?? 'アップロードに失敗しました';
         setSlots((prev) => ({
           ...prev,
-          [type]: { ...prev[type]!, uploading: false, error: 'アップロード失敗' },
+          [type]: { ...prev[type]!, uploading: false, error: msg },
         }));
-        toast.error('アップロードに失敗しました');
+        toast.error(msg);
       }
     },
     [user]
@@ -121,13 +145,12 @@ export default function UploadPage() {
 
     setDiagnosing(true);
     const controller = new AbortController();
-    const abortTimer = setTimeout(() => controller.abort(), 62_000); // client-side safety net
+    const abortTimer = setTimeout(() => controller.abort(), 62_000);
     try {
       const imageUrls = Object.values(slots)
         .filter((s) => s?.uploaded && s.url)
         .map((s) => s!.url!);
 
-      // Safety: measure total base64 size before fetch (iOS Safari has a ~512KB limit)
       const totalBytes = imageUrls.reduce((sum, url) => sum + url.length, 0);
       if (totalBytes > 400_000) {
         throw new Error(
@@ -136,7 +159,6 @@ export default function UploadPage() {
         );
       }
 
-      // Serialize body separately so we can catch stringify errors
       let bodyStr: string;
       try {
         bodyStr = JSON.stringify({
@@ -148,7 +170,6 @@ export default function UploadPage() {
         throw new Error('リクエストのシリアライズに失敗しました。');
       }
 
-      // Fetch with explicit error handling for network-level failures
       let response: Response;
       try {
         response = await fetch('/api/diagnose', {
@@ -158,11 +179,10 @@ export default function UploadPage() {
           signal: controller.signal,
         });
       } catch (fetchErr: any) {
-        if ((fetchErr as any)?.name === 'AbortError') {
+        if (fetchErr?.name === 'AbortError') {
           throw new Error('AI分析がタイムアウトしました。しばらく後に再試行してください。');
         }
-        const msg = fetchErr?.message ?? String(fetchErr);
-        throw new Error(`通信エラーが発生しました。ネットワークを確認してください。（${msg}）`);
+        throw new Error(`通信エラーが発生しました。ネットワークを確認してください。（${fetchErr?.message ?? ''}）`);
       }
 
       if (!response.ok) {
@@ -175,9 +195,7 @@ export default function UploadPage() {
           try {
             const errJson = await response.json();
             if (errJson?.error) errMsg = errJson.error;
-          } catch {
-            // Server returned non-JSON (e.g., Vercel HTML error page)
-          }
+          } catch { /* non-JSON error page */ }
         }
         throw new Error(errMsg);
       }
@@ -195,7 +213,7 @@ export default function UploadPage() {
         .filter((s) => s?.uploaded)
         .map((s) => ({
           id: `${s!.type}_${Date.now()}`,
-          userId: user!.uid,
+          userId: user?.uid ?? '',
           url: s!.url!,
           storagePath: '',
           type: s!.type,
@@ -220,22 +238,61 @@ export default function UploadPage() {
           <div className="mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">写真をアップロード</h1>
             <p className="text-white/50">
-              AIが複数の角度から分析します。明るい場所で撮影した写真を使用してください。
+              AIが複数の角度から分析します。下記の注意事項をよく読んでから写真を選択してください。
             </p>
           </div>
 
-          {/* Notice */}
-          <div className="mb-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
-            <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-            <div className="text-sm">
-              <p className="text-blue-300 font-medium">解析対象について</p>
-              <p className="text-blue-400/70 mt-0.5">
-                顔・全身・姿勢・体型・表情・清潔感を分析します。<strong>服装・ファッションは評価しません</strong>（別機能）。
+          {/* ── 写真の注意事項 ── */}
+          <Card variant="glass" className="mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Info className="w-5 h-5 text-blue-400 flex-shrink-0" />
+              <h2 className="text-white font-semibold">写真の注意事項</h2>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* NG */}
+              <div className="p-3 rounded-xl bg-red-500/5 border border-red-500/20">
+                <p className="text-red-300 font-medium text-xs mb-2 flex items-center gap-1">
+                  <XCircle className="w-3.5 h-3.5" /> NG（精度が下がる・拒否される場合あり）
+                </p>
+                <ul className="space-y-1.5">
+                  {photoRules.ng.map((rule, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-white/60">
+                      <span className="text-red-400 font-bold flex-shrink-0 mt-0.5">✗</span>
+                      {rule}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* OK */}
+              <div className="p-3 rounded-xl bg-green-500/5 border border-green-500/20">
+                <p className="text-green-300 font-medium text-xs mb-2 flex items-center gap-1">
+                  <CheckCircle className="w-3.5 h-3.5" /> OK（推奨）
+                </p>
+                <ul className="space-y-1.5">
+                  {photoRules.ok.map((rule, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-white/60">
+                      <span className="text-green-400 font-bold flex-shrink-0 mt-0.5">✓</span>
+                      {rule}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* AI分析対象の説明 */}
+            <div className="mt-4 p-3 rounded-xl bg-blue-500/5 border border-blue-500/20 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-300/80 leading-relaxed">
+                AIは<strong className="text-blue-300">顔・全身・姿勢・体型・表情・清潔感</strong>を分析します。
+                <strong className="text-blue-300">服装・ファッションは評価対象外</strong>です（別機能で対応）。
+                写真はサーバーに保存されず、診断後に破棄されます。
               </p>
             </div>
-          </div>
+          </Card>
 
-          {/* Image Slots Grid */}
+          {/* ── 写真スロット ── */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
             {imageSlots.map((slot) => {
               const slotData = slots[slot.type];
@@ -251,7 +308,7 @@ export default function UploadPage() {
             })}
           </div>
 
-          {/* Upload progress */}
+          {/* アップロード進捗バー */}
           <div className="mb-6 flex items-center gap-3">
             <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
               <div
@@ -264,7 +321,7 @@ export default function UploadPage() {
             </span>
           </div>
 
-          {/* Actions */}
+          {/* 診断ボタン */}
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <div className="text-sm text-white/40">
               {requiredUploaded ? (
@@ -293,11 +350,12 @@ export default function UploadPage() {
             </div>
           </div>
 
+          {/* 分析中インジケーター */}
           {diagnosing && (
             <div className="mt-6 p-5 rounded-2xl bg-primary-500/5 border border-primary-500/20">
               <div className="flex items-center gap-3 mb-3">
                 <Loader2 className="w-5 h-5 text-primary-400 animate-spin" />
-                <span className="text-white font-medium">AIが分析中です...</span>
+                <span className="text-white font-medium">AIが分析中です（最大60秒かかります）</span>
               </div>
               <div className="space-y-1.5 text-sm text-white/40">
                 <p>・顔まわりの印象を解析中</p>
@@ -356,7 +414,6 @@ function DropZoneSlot({ slot, slotData, onDrop, onRemove }: DropZoneSlotProps) {
         <input {...getInputProps()} />
 
         {slotData?.preview ? (
-          // Show preview
           <div className="absolute inset-0">
             <img
               src={slotData.preview}
@@ -375,6 +432,12 @@ function DropZoneSlot({ slot, slotData, onDrop, onRemove }: DropZoneSlotProps) {
                 </div>
               </div>
             )}
+            {slotData.error && (
+              <div className="absolute inset-0 bg-red-900/60 flex flex-col items-center justify-center p-2">
+                <XCircle className="w-6 h-6 text-red-300 mb-1" />
+                <p className="text-red-200 text-xs text-center leading-tight">{slotData.error}</p>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center p-3">
@@ -390,7 +453,7 @@ function DropZoneSlot({ slot, slotData, onDrop, onRemove }: DropZoneSlotProps) {
         )}
       </div>
 
-      {/* Remove button */}
+      {/* 削除ボタン */}
       {slotData && !slotData.uploading && (
         <button
           onClick={(e) => {
@@ -398,6 +461,7 @@ function DropZoneSlot({ slot, slotData, onDrop, onRemove }: DropZoneSlotProps) {
             onRemove();
           }}
           className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center shadow-lg hover:bg-red-400 transition-colors z-10"
+          aria-label="削除"
         >
           <X className="w-3 h-3 text-white" />
         </button>

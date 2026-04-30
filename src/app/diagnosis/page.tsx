@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   AlertTriangle,
@@ -16,7 +16,6 @@ import {
   MapPin,
   Loader2,
 } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
 import { useDiagnosis } from '@/context/DiagnosisContext';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { Card } from '@/components/ui/Card';
@@ -38,9 +37,7 @@ const scoreItems = [
 
 function DiagnosisContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const { user } = useAuth();
-  const { currentDiagnosis, setCurrentDiagnosis } = useDiagnosis();
+  const { currentDiagnosis } = useDiagnosis();
   const [result, setResult] = useState<DiagnosisResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
