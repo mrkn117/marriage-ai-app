@@ -21,7 +21,12 @@ export default function HistoryPage() {
 
   useEffect(() => {
     if (!user) return;
-    getUserDiagnoses(user.uid, 20)
+    Promise.race([
+      getUserDiagnoses(user.uid, 20),
+      new Promise<DiagnosisResult[]>((_, reject) =>
+        setTimeout(() => reject(new Error('Firestore timeout')), 10_000)
+      ),
+    ])
       .then(setDiagnoses)
       .catch((err) => {
         console.error('Failed to load diagnoses:', err);

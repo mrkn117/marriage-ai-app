@@ -129,7 +129,8 @@ function DiagnosisContent() {
               size="sm"
               onClick={() => {
                 if (navigator.share) {
-                  navigator.share({ title: '婚活AI診断結果', text: `総合スコア: ${result.scores.total}点` });
+                  navigator.share({ title: '婚活AI診断結果', text: `総合スコア: ${result.scores.total}点` })
+                    .catch(() => { /* ユーザーがキャンセルした場合は無視 */ });
                 }
               }}
               icon={<Share2 className="w-4 h-4" />}

@@ -70,7 +70,12 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return;
-    getUserDiagnoses(user.uid, 3)
+    Promise.race([
+      getUserDiagnoses(user.uid, 3),
+      new Promise<DiagnosisResult[]>((_, reject) =>
+        setTimeout(() => reject(new Error('Firestore timeout')), 10_000)
+      ),
+    ])
       .then(setRecentDiagnoses)
       .catch((err) => {
         console.error('Failed to load diagnoses:', err);

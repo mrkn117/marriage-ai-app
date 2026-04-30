@@ -222,7 +222,7 @@ export default function UploadPage() {
       setUploadedImages(uploadedImages);
 
       toast.success('診断が完了しました！');
-      router.push(`/diagnosis?id=${result.id}`);
+      router.push(result?.id ? `/diagnosis?id=${result.id}` : '/diagnosis');
     } catch (err: any) {
       toast.error(err.message || '診断に失敗しました。もう一度お試しください');
     } finally {

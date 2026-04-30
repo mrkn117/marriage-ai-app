@@ -53,7 +53,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setUser(firebaseUser);
       try {
-        const profile = await getUserProfile(firebaseUser.uid);
+        const profile = await Promise.race([
+          getUserProfile(firebaseUser.uid),
+          new Promise<null>((_, reject) =>
+            setTimeout(() => reject(new Error('Profile load timeout')), 8_000)
+          ),
+        ]);
         setUserProfile(profile);
       } catch (e) {
         console.error('Failed to load profile:', e);
