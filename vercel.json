@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "src/app/api/diagnose/route.ts": { "maxDuration": 60 },
+    "src/app/api/fashion/route.ts": { "maxDuration": 60 },
+    "src/app/api/dateplan/route.ts": { "maxDuration": 60 },
+    "src/app/api/profile/route.ts": { "maxDuration": 60 }
+  }
+}

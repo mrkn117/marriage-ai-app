@@ -40,6 +40,7 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   if (!snap.exists()) return null;
   const d = snap.data();
   return {
+    uid,  // always inject uid from document path (not always stored in the doc)
     ...d,
     createdAt: d.createdAt?.toDate(),
     updatedAt: d.updatedAt?.toDate(),

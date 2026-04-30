@@ -16,14 +16,21 @@ export async function POST(req: NextRequest) {
     if (!userProfile) {
       return NextResponse.json({ error: 'プロフィールが必要です' }, { status: 400 });
     }
+    // Ensure all image URLs are valid data URLs or https URLs
+    const validImageUrls = imageUrls.filter(
+      (url) => url.startsWith('data:image/') || url.startsWith('https://')
+    );
+    if (validImageUrls.length === 0) {
+      return NextResponse.json({ error: '有効な画像がありません' }, { status: 400 });
+    }
 
     // Build vision messages with image URLs
-    const imageMessages = imageUrls.map((url) => ({
+    const imageMessages = validImageUrls.map((url) => ({
       type: 'image_url' as const,
       image_url: { url, detail: 'high' as const },
     }));
 
-    const userText = buildDiagnosisUserPrompt(userProfile, imageUrls, currentDate);
+    const userText = buildDiagnosisUserPrompt(userProfile, validImageUrls, currentDate);
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -86,7 +93,7 @@ export async function POST(req: NextRequest) {
     const id = await saveDiagnosisResult(diagnosisData);
 
     // Return imageUrls in response (for in-memory display) but don't persist base64 to Firestore
-    return NextResponse.json({ id, ...diagnosisData, imageUrls });
+    return NextResponse.json({ id, ...diagnosisData, imageUrls: validImageUrls });
   } catch (err: any) {
     console.error('Diagnosis error:', err);
     return NextResponse.json(
