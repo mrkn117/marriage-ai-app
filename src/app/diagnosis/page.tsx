@@ -102,7 +102,7 @@ function DiagnosisContent() {
             className="mb-8 flex items-center justify-between"
           >
             <div>
-              <p className="text-white/40 text-sm">{formatDate(result.createdAt)}</p>
+              <p className="text-white/40 text-sm">{result.createdAt ? formatDate(result.createdAt) : ''}</p>
               <h1 className="text-2xl sm:text-3xl font-bold text-white mt-1">診断結果</h1>
             </div>
             <Button
