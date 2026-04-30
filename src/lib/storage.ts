@@ -1,12 +1,3 @@
-import {
-  ref,
-  uploadBytesResumable,
-  getDownloadURL,
-  deleteObject,
-  UploadTaskSnapshot,
-} from 'firebase/storage';
-import { storage } from './firebase';
-
 export type ImageType = 'face' | 'full-body' | 'side' | 'back' | 'angle' | 'expression';
 
 export interface UploadProgress {
@@ -15,44 +6,33 @@ export interface UploadProgress {
   error?: string;
 }
 
+// Convert file to base64 data URL (no Firebase Storage needed)
 export async function uploadImage(
   file: File,
   userId: string,
   imageType: ImageType,
   onProgress?: (progress: number) => void
 ): Promise<string> {
-  const ext = file.name.split('.').pop() || 'jpg';
-  const timestamp = Date.now();
-  const path = `users/${userId}/images/${imageType}_${timestamp}.${ext}`;
-  const storageRef = ref(storage, path);
-
   return new Promise((resolve, reject) => {
-    const uploadTask = uploadBytesResumable(storageRef, file, {
-      contentType: file.type,
-    });
-
-    uploadTask.on(
-      'state_changed',
-      (snapshot: UploadTaskSnapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        onProgress?.(Math.round(progress));
-      },
-      (error) => reject(error),
-      async () => {
-        const url = await getDownloadURL(uploadTask.snapshot.ref);
-        resolve(url);
+    const reader = new FileReader();
+    reader.onprogress = (e) => {
+      if (e.lengthComputable) {
+        onProgress?.(Math.round((e.loaded / e.total) * 100));
       }
-    );
+    };
+    reader.onload = () => {
+      onProgress?.(100);
+      resolve(reader.result as string);
+    };
+    reader.onerror = () => reject(new Error('ファイルの読み込みに失敗しました'));
+    reader.readAsDataURL(file);
   });
 }
 
 export async function deleteImage(storagePath: string): Promise<void> {
-  const storageRef = ref(storage, storagePath);
-  await deleteObject(storageRef);
+  // No-op: images are base64, nothing to delete
 }
 
 export function getStoragePathFromUrl(url: string): string {
-  const baseUrl = `https://firebasestorage.googleapis.com/v0/b/${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}/o/`;
-  const path = url.replace(baseUrl, '').split('?')[0];
-  return decodeURIComponent(path);
+  return '';
 }
