@@ -14,6 +14,7 @@ import {
   Info,
   AlertTriangle,
   XCircle,
+  MapPin,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useDiagnosis } from '@/context/DiagnosisContext';
@@ -41,15 +42,23 @@ const photoRules = {
     'サングラス・マスク・帽子で顔が隠れている',
     '加工・フィルター使用（美肌・目拡大など）',
     '暗所・逆光・ピンボケ写真',
+    '背景が散らかっている・物が多い（AIが拒否する原因になります）',
     '集合写真・遠景（顔が小さすぎる）',
     'スクリーンショットや画面を再撮影したもの',
   ],
   ok: [
-    '自然光など明るい場所で撮影',
-    '顔が鮮明に写っている（正面推奨）',
-    '全身は頭から足まで入っている',
+    '白い壁・薄色の無地壁を背景にする（最推奨）',
+    '日中の自然光が入る明るい室内 or 屋外の日陰',
+    '顔写真：正面向き・胸から上・顔が画面の半分以上',
+    '全身写真：壁の前にまっすぐ立ち・頭から足まで入れる',
     '加工なし・ありのままの状態',
     'JPEG・PNG・WebP形式（10MB以下）',
+  ],
+  places: [
+    '自宅の白壁の前（最も安定・AI判定精度が高い）',
+    '窓際（昼間）：自然光で顔が明るく写る',
+    '屋外の影になった場所：均一な明るさで撮りやすい',
+    'ショッピングモールや廊下など照明が均一な場所',
   ],
 };
 
@@ -281,8 +290,23 @@ export default function UploadPage() {
               </div>
             </div>
 
+            {/* 撮影場所の推奨 */}
+            <div className="mt-4 p-3 rounded-xl bg-purple-500/5 border border-purple-500/20">
+              <p className="text-purple-300 font-medium text-xs mb-2 flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5" /> おすすめの撮影場所・スタイル
+              </p>
+              <ul className="space-y-1.5">
+                {photoRules.places.map((place, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs text-white/60">
+                    <span className="text-purple-400 font-bold flex-shrink-0 mt-0.5">◎</span>
+                    {place}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
             {/* AI分析対象の説明 */}
-            <div className="mt-4 p-3 rounded-xl bg-blue-500/5 border border-blue-500/20 flex items-start gap-2">
+            <div className="mt-3 p-3 rounded-xl bg-blue-500/5 border border-blue-500/20 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-blue-300/80 leading-relaxed">
                 AIは<strong className="text-blue-300">顔・全身・姿勢・体型・表情・清潔感</strong>を分析します。

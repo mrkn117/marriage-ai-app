@@ -132,9 +132,15 @@ async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
   const finishReason = choice?.finish_reason;
 
   // ── 4. Handle content filter / truncation / empty response ──────────
-  if (finishReason === 'content_filter' || !rawContent.trim()) {
+  if (finishReason === 'content_filter') {
     return NextResponse.json(
-      { error: 'AIが画像を処理できませんでした。本人のみが写った写真をお使いください。' },
+      { error: 'AIが写真を処理できませんでした。背景が散らかっている・暗い・複数人写っているとAIが拒否することがあります。明るい場所・シンプルな背景（白壁など）で撮り直してください。' },
+      { status: 422 }
+    );
+  }
+  if (!rawContent.trim()) {
+    return NextResponse.json(
+      { error: 'AIの応答が空でした。しばらく後にもう一度お試しください。' },
       { status: 422 }
     );
   }
