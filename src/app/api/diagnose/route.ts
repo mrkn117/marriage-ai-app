@@ -114,7 +114,8 @@ async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
         },
       ],
       temperature: 0.7,
-      max_tokens: 1500,
+      max_tokens: 2000,
+      response_format: { type: 'json_object' },
     });
   } catch (err: any) {
     console.error('[diagnose] OpenAI error:', err?.message, err?.status);
@@ -130,22 +131,26 @@ async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
   const rawContent = choice?.message?.content ?? '';
   const finishReason = choice?.finish_reason;
 
-  // ── 4. Handle content filter / empty response ─────────────────────
+  // ── 4. Handle content filter / truncation / empty response ──────────
   if (finishReason === 'content_filter' || !rawContent.trim()) {
     return NextResponse.json(
       { error: 'AIが画像を処理できませんでした。本人のみが写った写真をお使いください。' },
       { status: 422 }
     );
   }
+  if (finishReason === 'length') {
+    // Response was cut off at max_tokens — log and attempt parse anyway; if it fails, return clear error
+    console.warn('[diagnose] OpenAI response truncated (hit max_tokens). Raw:', rawContent.slice(0, 200));
+  }
 
   // ── 5. Parse JSON response ────────────────────────────────────────
   const parsed = parseJson(rawContent);
   if (!parsed) {
-    console.error('[diagnose] Parse failed. Content:', rawContent.slice(0, 300));
-    return NextResponse.json(
-      { error: 'AIの返答を解析できませんでした。再度お試しください。' },
-      { status: 500 }
-    );
+    console.error('[diagnose] Parse failed. finish_reason:', finishReason, 'Content:', rawContent.slice(0, 300));
+    const errMsg = finishReason === 'length'
+      ? 'AI応答が長すぎて切れました。再度お試しください。'
+      : 'AIの返答を解析できませんでした。再度お試しください。';
+    return NextResponse.json({ error: errMsg }, { status: 500 });
   }
 
   // ── 6. Build normalized scores ────────────────────────────────────
