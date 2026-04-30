@@ -49,20 +49,37 @@ export async function POST(req: NextRequest) {
       ],
       temperature: 0.7,
       max_tokens: 2000,
-      response_format: { type: 'json_object' },
     });
 
     const content = completion.choices[0]?.message?.content ?? '';
 
+    // Try multiple parsing strategies
     let parsed: any;
     try {
+      // 1. Direct JSON parse
       parsed = JSON.parse(content);
     } catch {
-      // fallback: extract JSON block if present
-      const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) ??
-                        content.match(/\{[\s\S]*"scores"[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('AI response parsing failed');
-      parsed = JSON.parse(jsonMatch[1] ?? jsonMatch[0]);
+      // 2. Extract from ```json block
+      const codeBlock = content.match(/```json\s*([\s\S]*?)\s*```/);
+      if (codeBlock) {
+        try { parsed = JSON.parse(codeBlock[1]); } catch { /* continue */ }
+      }
+      // 3. Extract first {...} block containing "scores"
+      if (!parsed) {
+        const jsonBlock = content.match(/\{[\s\S]*?"scores"[\s\S]*?\}(?=\s*$|\s*```)/);
+        if (jsonBlock) {
+          try { parsed = JSON.parse(jsonBlock[0]); } catch { /* continue */ }
+        }
+      }
+      // 4. Find outermost { } pair
+      if (!parsed) {
+        const start = content.indexOf('{');
+        const end = content.lastIndexOf('}');
+        if (start !== -1 && end > start) {
+          try { parsed = JSON.parse(content.slice(start, end + 1)); } catch { /* continue */ }
+        }
+      }
+      if (!parsed) throw new Error('AI response parsing failed');
     }
 
     // Validate and normalize scores

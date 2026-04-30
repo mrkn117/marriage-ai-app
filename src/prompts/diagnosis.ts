@@ -19,7 +19,8 @@ export function buildDiagnosisSystemPrompt(): string {
 - 曖昧なアドバイス（「身だしなみに気をつけましょう」はNG）
 - 服装・ファッションへの言及
 
-## 出力形式（必ず以下のJSONオブジェクトのみを返す。コードブロック不要）
+## 出力形式（必ず以下のJSON形式のみで返す。余計な文章・説明は一切不要）
+\`\`\`json
 {
   "scores": {
     "firstImpression": <0-20の整数>,
@@ -41,7 +42,8 @@ export function buildDiagnosisSystemPrompt(): string {
   ],
   "thisWeekAction": "<今週中にできる具体的行動>",
   "oneMonthAction": "<1ヶ月以内にすべき行動>"
-}`;
+}
+\`\`\``;
 }
 
 export function buildDiagnosisUserPrompt(
