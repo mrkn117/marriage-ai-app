@@ -1,67 +1,140 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { buildDatePlanSystemPrompt, buildDatePlanUserPrompt } from '@/prompts/dateplan';
-import { saveDatePlan } from '@/lib/firestore';
 import type { DatePlanRequest, DatePlan } from '@/types';
+
+export const maxDuration = 60;
+
+function parseJson(content: string): any {
+  try { return JSON.parse(content); } catch { /* next */ }
+  const m2 = content.match(/```json\s*([\s\S]*?)\s*```/);
+  if (m2) try { return JSON.parse(m2[1]); } catch { /* next */ }
+  const m3 = content.match(/```\s*([\s\S]*?)\s*```/);
+  if (m3) try { return JSON.parse(m3[1]); } catch { /* next */ }
+  const start = content.indexOf('{');
+  const end = content.lastIndexOf('}');
+  if (start !== -1 && end > start) {
+    try { return JSON.parse(content.slice(start, end + 1)); } catch { /* next */ }
+  }
+  return null;
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const body: DatePlanRequest = await req.json();
-    const { userProfile, area, budget, timeSlot, isFirstDate, partnerDescription } = body;
+    return await handleDatePlan(req);
+  } catch (err: any) {
+    console.error('[dateplan] Unhandled error:', err);
+    return NextResponse.json(
+      { error: `予期しないエラー: ${err?.message ?? String(err)}` },
+      { status: 500 }
+    );
+  }
+}
 
-    const completion = await openai.chat.completions.create({
+async function handleDatePlan(req: NextRequest): Promise<NextResponse> {
+  // 1. Parse request
+  let body: DatePlanRequest;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'リクエスト解析失敗' }, { status: 400 });
+  }
+
+  const { userProfile, area, budget, timeSlot, isFirstDate, partnerDescription } = body;
+
+  if (!userProfile) {
+    return NextResponse.json({ error: 'プロフィールが必要です' }, { status: 400 });
+  }
+  if (!area?.trim()) {
+    return NextResponse.json({ error: 'デートエリアが必要です' }, { status: 400 });
+  }
+
+  // 2. Check API key
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json(
+      { error: 'OpenAI APIキーが設定されていません（環境変数未設定）' },
+      { status: 500 }
+    );
+  }
+
+  // 3. Call OpenAI with timeout
+  let completion;
+  try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 55_000 });
+    completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
         { role: 'system', content: buildDatePlanSystemPrompt() },
         {
           role: 'user',
-          content: buildDatePlanUserPrompt(
-            userProfile,
-            area,
-            budget,
-            timeSlot,
-            isFirstDate,
-            partnerDescription
-          ),
+          content: buildDatePlanUserPrompt(userProfile, area, budget, timeSlot, isFirstDate, partnerDescription),
         },
       ],
       temperature: 0.8,
       max_tokens: 3000,
       response_format: { type: 'json_object' },
     });
-
-    const content = completion.choices[0]?.message?.content ?? '';
-    let parsed: any;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) ??
-                        content.match(/\{[\s\S]*"planName"[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('Date plan response parsing failed');
-      parsed = JSON.parse(jsonMatch[1] ?? jsonMatch[0]);
-    }
-
-    const data: Omit<DatePlan, 'id'> = {
-      userId: userProfile.uid,
-      planName: parsed.planName ?? 'デートプラン',
-      area,
-      totalBudget: budget,
-      timeSlot,
-      isFirstDate,
-      partnerType: partnerDescription,
-      schedule: parsed.schedule ?? [],
-      conversationFlow: parsed.conversationFlow ?? '',
-      ngActions: parsed.ngActions ?? [],
-      invitePhrase: parsed.invitePhrase ?? '',
-      rainyDayAlternative: parsed.rainyDayAlternative ?? '',
-      createdAt: new Date(),
-    };
-
-    const id = await saveDatePlan(data);
-    return NextResponse.json({ id, ...data });
   } catch (err: any) {
-    console.error('Date plan error:', err);
-    return NextResponse.json({ error: err.message ?? 'デートプランの生成に失敗しました' }, { status: 500 });
+    console.error('[dateplan] OpenAI error:', err?.message, err?.status);
+    const msg = err?.message ?? 'OpenAI APIエラー';
+    const isTimeout = msg.includes('timeout') || msg.includes('timed out') || err?.status === 408;
+    return NextResponse.json(
+      { error: isTimeout ? 'AIの応答がタイムアウトしました。再度お試しください。' : `AI呼び出し失敗: ${msg}` },
+      { status: 500 }
+    );
   }
+
+  const choice = completion.choices[0];
+  const rawContent = choice?.message?.content ?? '';
+  const finishReason = choice?.finish_reason;
+
+  // 4. Handle content filter / empty response
+  if (finishReason === 'content_filter' || !rawContent.trim()) {
+    return NextResponse.json(
+      { error: 'AIがリクエストを処理できませんでした。条件を変えて再度お試しください。' },
+      { status: 422 }
+    );
+  }
+
+  // 5. Parse JSON response
+  const parsed = parseJson(rawContent);
+  if (!parsed) {
+    console.error('[dateplan] Parse failed. finish_reason:', finishReason, 'Content:', rawContent.slice(0, 300));
+    const errMsg = finishReason === 'length'
+      ? 'AI応答が長すぎて切れました。再度お試しください。'
+      : 'AIの返答を解析できませんでした。再度お試しください。';
+    return NextResponse.json({ error: errMsg }, { status: 500 });
+  }
+
+  const data: Omit<DatePlan, 'id'> = {
+    userId: userProfile.uid,
+    planName: String(parsed.planName ?? 'デートプラン'),
+    area,
+    totalBudget: budget,
+    timeSlot,
+    isFirstDate,
+    partnerType: partnerDescription,
+    schedule: Array.isArray(parsed.schedule) ? parsed.schedule : [],
+    conversationFlow: String(parsed.conversationFlow ?? ''),
+    ngActions: Array.isArray(parsed.ngActions) ? parsed.ngActions : [],
+    invitePhrase: String(parsed.invitePhrase ?? ''),
+    rainyDayAlternative: String(parsed.rainyDayAlternative ?? ''),
+    createdAt: new Date(),
+  };
+
+  // 6. Save to Firestore (non-fatal, 5s timeout)
+  let id = `local_${Date.now()}`;
+  try {
+    const { saveDatePlan } = await import('@/lib/firestore');
+    id = await Promise.race([
+      saveDatePlan(data),
+      new Promise<string>((_, reject) =>
+        setTimeout(() => reject(new Error('Firestore timeout')), 5000)
+      ),
+    ]);
+  } catch (err: any) {
+    console.error('[dateplan] Firestore save failed (non-fatal):', err?.message);
+  }
+
+  return NextResponse.json({ id, ...data });
 }

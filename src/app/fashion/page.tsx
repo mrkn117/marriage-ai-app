@@ -90,28 +90,60 @@ export default function FashionPage() {
       return;
     }
     setGenerating(true);
+    const controller = new AbortController();
+    const abortTimer = setTimeout(() => controller.abort(), 62_000);
     try {
       const season = getSeason(now.getMonth() + 1);
-      const response = await fetch('/api/fashion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userProfile: { ...userProfile, uid: user!.uid },
-          currentDate: now.toISOString().split('T')[0],
-          season,
-          temperature: Number(temperature),
-          weather,
-          dateType,
-        }),
-      });
-      if (!response.ok) throw new Error('Failed');
-      const data = await response.json();
+      let response: Response;
+      try {
+        response = await fetch('/api/fashion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userProfile: { ...userProfile, uid: user!.uid },
+            currentDate: now.toISOString().split('T')[0],
+            season,
+            temperature: Number(temperature),
+            weather,
+            dateType,
+          }),
+          signal: controller.signal,
+        });
+      } catch (fetchErr: any) {
+        if (fetchErr?.name === 'AbortError') {
+          throw new Error('タイムアウトしました。しばらく後に再試行してください。');
+        }
+        throw new Error('通信エラーが発生しました。ネットワークを確認してください。');
+      }
+
+      if (!response.ok) {
+        const status = response.status;
+        let errMsg = `生成に失敗しました（HTTP ${status}）`;
+        if (status === 504 || status === 524 || status === 408) {
+          errMsg = 'タイムアウトしました。しばらく後に再試行してください。';
+        } else {
+          try {
+            const errJson = await response.json();
+            if (errJson?.error) errMsg = errJson.error;
+          } catch { /* non-JSON error body */ }
+        }
+        throw new Error(errMsg);
+      }
+
+      let data: any;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error('サーバーの返答を解析できませんでした。再度お試しください。');
+      }
+
       setResult(data);
       setCurrentFashion(data);
       toast.success('服装提案を生成しました！');
-    } catch (err) {
-      toast.error('生成に失敗しました。もう一度お試しください');
+    } catch (err: any) {
+      toast.error(err.message || '生成に失敗しました。もう一度お試しください');
     } finally {
+      clearTimeout(abortTimer);
       setGenerating(false);
     }
   };

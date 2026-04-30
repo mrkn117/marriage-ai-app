@@ -17,12 +17,16 @@ export default function HistoryPage() {
   const { user } = useAuth();
   const [diagnoses, setDiagnoses] = useState<DiagnosisResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     getUserDiagnoses(user.uid, 20)
       .then(setDiagnoses)
-      .catch(console.error)
+      .catch((err) => {
+        console.error('Failed to load diagnoses:', err);
+        setLoadError(true);
+      })
       .finally(() => setLoading(false));
   }, [user]);
 
@@ -46,6 +50,15 @@ export default function HistoryPage() {
             <div className="flex justify-center py-20">
               <Loader2 className="w-8 h-8 text-primary-400 animate-spin" />
             </div>
+          ) : loadError ? (
+            <Card variant="glass" className="text-center py-16">
+              <History className="w-12 h-12 text-red-400/50 mx-auto mb-4" />
+              <h3 className="text-white font-semibold text-lg mb-2">読み込みに失敗しました</h3>
+              <p className="text-white/40 text-sm mb-6">
+                ネットワークを確認してページを再読み込みしてください
+              </p>
+              <Button onClick={() => window.location.reload()}>再読み込み</Button>
+            </Card>
           ) : diagnoses.length === 0 ? (
             <Card variant="glass" className="text-center py-16">
               <Camera className="w-12 h-12 text-white/20 mx-auto mb-4" />
@@ -130,7 +143,7 @@ export default function HistoryPage() {
                             <p className="text-white/60 text-xs line-clamp-2">
                               {d.harshEvaluation}
                             </p>
-                            <p className="text-white/30 text-xs mt-1.5">{formatDate(d.createdAt)}</p>
+                            <p className="text-white/30 text-xs mt-1.5">{d.createdAt ? formatDate(d.createdAt) : ''}</p>
                           </div>
 
                           <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-white/50 transition-colors flex-shrink-0" />

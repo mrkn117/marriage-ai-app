@@ -45,9 +45,17 @@ export default function RegisterPage() {
       toast.success('登録が完了しました！');
       router.push('/onboarding');
     } catch (err: any) {
-      const msg = err.code === 'auth/email-already-in-use'
-        ? 'このメールアドレスは既に登録されています'
-        : '登録に失敗しました。もう一度お試しください';
+      const code = err?.code ?? '';
+      const msg =
+        code === 'auth/email-already-in-use'
+          ? 'このメールアドレスは既に登録されています'
+          : code === 'auth/weak-password'
+          ? 'パスワードが弱すぎます。8文字以上で設定してください'
+          : code === 'auth/invalid-email'
+          ? 'メールアドレスの形式が正しくありません'
+          : code === 'auth/network-request-failed'
+          ? 'ネットワークエラーが発生しました。接続を確認してください'
+          : '登録に失敗しました。もう一度お試しください';
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -60,8 +68,15 @@ export default function RegisterPage() {
       await loginWithGoogle();
       toast.success('登録しました！');
       router.push('/onboarding');
-    } catch (err) {
-      toast.error('Google登録に失敗しました');
+    } catch (err: any) {
+      const code = err?.code ?? '';
+      const msg =
+        code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request'
+          ? '登録がキャンセルされました'
+          : code === 'auth/network-request-failed'
+          ? 'ネットワークエラーが発生しました'
+          : 'Google登録に失敗しました';
+      toast.error(msg);
     } finally {
       setGoogleLoading(false);
     }

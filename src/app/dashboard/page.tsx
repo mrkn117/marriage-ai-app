@@ -61,6 +61,7 @@ export default function DashboardPage() {
   const { user, userProfile } = useAuth();
   const [recentDiagnoses, setRecentDiagnoses] = useState<DiagnosisResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const now = new Date();
   const month = now.getMonth() + 1;
@@ -71,7 +72,10 @@ export default function DashboardPage() {
     if (!user) return;
     getUserDiagnoses(user.uid, 3)
       .then(setRecentDiagnoses)
-      .catch(console.error)
+      .catch((err) => {
+        console.error('Failed to load diagnoses:', err);
+        setLoadError(true);
+      })
       .finally(() => setLoading(false));
   }, [user]);
 
@@ -136,6 +140,13 @@ export default function DashboardPage() {
             ))}
           </div>
 
+          {/* Firestore load error notice */}
+          {loadError && (
+            <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-300">
+              診断履歴の読み込みに失敗しました。ページを再読み込みしてください。
+            </div>
+          )}
+
           {/* Latest Diagnosis Result */}
           {latestDiagnosis ? (
             <motion.div
@@ -148,7 +159,7 @@ export default function DashboardPage() {
                   <div>
                     <h2 className="text-white font-bold text-lg">最新の診断結果</h2>
                     <p className="text-white/40 text-xs mt-0.5">
-                      {formatDate(latestDiagnosis.createdAt)}
+                      {latestDiagnosis.createdAt ? formatDate(latestDiagnosis.createdAt) : ''}
                     </p>
                   </div>
                   <Link href={`/diagnosis?id=${latestDiagnosis.id}`}>

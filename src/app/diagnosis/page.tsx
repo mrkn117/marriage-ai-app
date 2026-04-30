@@ -43,6 +43,7 @@ function DiagnosisContent() {
   const { currentDiagnosis, setCurrentDiagnosis } = useDiagnosis();
   const [result, setResult] = useState<DiagnosisResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const diagnosisId = searchParams.get('id');
 
   useEffect(() => {
@@ -54,10 +55,14 @@ function DiagnosisContent() {
       }
       if (diagnosisId) {
         try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 10_000);
           const r = await getDiagnosisResult(diagnosisId);
+          clearTimeout(timer);
           setResult(r);
-        } catch (e) {
-          console.error(e);
+        } catch (e: any) {
+          console.error('Failed to load diagnosis:', e);
+          setLoadError(true);
         }
       }
       setLoading(false);
@@ -70,6 +75,21 @@ function DiagnosisContent() {
       <AuthGuard>
         <div className="min-h-screen bg-dark-900 flex items-center justify-center">
           <Loader2 className="w-10 h-10 text-primary-400 animate-spin" />
+        </div>
+      </AuthGuard>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <AuthGuard>
+        <div className="min-h-screen bg-dark-900 pt-20 flex items-center justify-center px-4">
+          <div className="text-center">
+            <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+            <h2 className="text-white font-bold text-xl mb-2">読み込みに失敗しました</h2>
+            <p className="text-white/50 text-sm mb-4">ネットワークを確認して再試行してください</p>
+            <Button onClick={() => window.location.reload()}>再読み込み</Button>
+          </div>
         </div>
       </AuthGuard>
     );

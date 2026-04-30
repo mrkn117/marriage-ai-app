@@ -38,9 +38,17 @@ export default function LoginPage() {
       toast.success('ログインしました');
       router.push('/dashboard');
     } catch (err: any) {
-      const msg = err.code === 'auth/invalid-credential'
-        ? 'メールアドレスまたはパスワードが違います'
-        : 'ログインに失敗しました';
+      const code = err?.code ?? '';
+      const msg =
+        code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found'
+          ? 'メールアドレスまたはパスワードが違います'
+          : code === 'auth/too-many-requests'
+          ? 'ログイン試行回数が多すぎます。しばらく時間をおいてください'
+          : code === 'auth/network-request-failed'
+          ? 'ネットワークエラーが発生しました。接続を確認してください'
+          : code === 'auth/user-disabled'
+          ? 'このアカウントは無効化されています'
+          : 'ログインに失敗しました';
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -53,8 +61,17 @@ export default function LoginPage() {
       await loginWithGoogle();
       toast.success('Googleでログインしました');
       router.push('/dashboard');
-    } catch (err) {
-      toast.error('Googleログインに失敗しました');
+    } catch (err: any) {
+      const code = err?.code ?? '';
+      const msg =
+        code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request'
+          ? 'ログインがキャンセルされました'
+          : code === 'auth/network-request-failed'
+          ? 'ネットワークエラーが発生しました'
+          : code === 'auth/too-many-requests'
+          ? 'しばらく時間をおいてから再試行してください'
+          : 'Googleログインに失敗しました';
+      toast.error(msg);
     } finally {
       setGoogleLoading(false);
     }
