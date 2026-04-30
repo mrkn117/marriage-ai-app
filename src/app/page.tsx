@@ -102,21 +102,16 @@ export default function LandingPage() {
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/register">
+              <Link href="/onboarding">
                 <Button size="lg" className="group shadow-xl shadow-primary-500/20">
-                  無料で診断を始める
+                  今すぐ診断を始める
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </Link>
-              <Link href="/login">
-                <Button variant="outline" size="lg">
-                  ログイン
                 </Button>
               </Link>
             </div>
 
             <p className="mt-4 text-white/30 text-xs">
-              無料登録・クレジットカード不要 / データはいつでも削除可
+              登録不要・無料・クレジットカード不要
             </p>
           </motion.div>
 
@@ -232,9 +227,9 @@ export default function LandingPage() {
                 無料登録して、まず診断を受けてみてください。<br />
                 厳しい言葉の先に、本当の改善があります。
               </p>
-              <Link href="/register">
+              <Link href="/onboarding">
                 <Button size="lg" fullWidth className="max-w-xs mx-auto">
-                  無料で始める
+                  今すぐ始める
                   <ArrowRight className="w-5 h-5" />
                 </Button>
               </Link>
