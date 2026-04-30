@@ -288,7 +288,7 @@ function FashionPlanCard({
       {/* Items */}
       <div className="space-y-3 mb-5">
         <h3 className="text-white/70 text-sm font-medium">アイテム一覧</h3>
-        {plan.items.map((item, i) => {
+        {(Array.isArray(plan.items) ? plan.items : []).map((item, i) => {
           const itemId = `${plan.type}-${i}`;
           const isExpanded = expandedItems[itemId];
           return (

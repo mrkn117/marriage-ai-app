@@ -110,7 +110,16 @@ async function handleFashion(req: NextRequest): Promise<NextResponse> {
     temperature: String(temperature),
     weather,
     dateType,
-    plans: Array.isArray(parsed.plans) ? parsed.plans : [],
+    plans: Array.isArray(parsed.plans)
+      ? parsed.plans.map((p: any) => ({
+          ...p,
+          items: Array.isArray(p?.items) ? p.items : [],
+          totalPrice: Number(p?.totalPrice) || 0,
+          label: String(p?.label ?? ''),
+          impression: String(p?.impression ?? ''),
+          stylingTips: String(p?.stylingTips ?? ''),
+        }))
+      : [],
     createdAt: new Date(),
   };
 
