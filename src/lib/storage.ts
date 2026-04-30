@@ -6,8 +6,9 @@ export interface UploadProgress {
   error?: string;
 }
 
-// Compress image to JPEG (max 800px, q=0.82) and sanitize base64 for OpenAI
-function compressImage(file: File, maxPx = 800, quality = 0.82): Promise<string> {
+// iOS Safari has a fetch body size limit (~512KB).
+// Keep max 512px so that 2 images stay comfortably under 200KB total.
+function compressImage(file: File, maxPx = 512, quality = 0.75): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
@@ -28,21 +29,17 @@ function compressImage(file: File, maxPx = 800, quality = 0.82): Promise<string>
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      // Request JPEG; some browsers may produce PNG — both are fine for OpenAI
+      // Produce JPEG; strip whitespace from base64 payload
       let dataUrl = canvas.toDataURL('image/jpeg', quality);
-
-      // Sanitize: strip any whitespace from the base64 payload
       const comma = dataUrl.indexOf(',');
       if (comma !== -1) {
-        const header = dataUrl.slice(0, comma + 1);
-        const payload = dataUrl.slice(comma + 1).replace(/\s+/g, '');
-        dataUrl = header + payload;
+        dataUrl =
+          dataUrl.slice(0, comma + 1) +
+          dataUrl.slice(comma + 1).replace(/\s+/g, '');
       }
 
-      // Validate that we got a supported format
       const supported = ['data:image/jpeg;base64,', 'data:image/png;base64,', 'data:image/webp;base64,'];
-      const ok = supported.some((p) => dataUrl.startsWith(p)) && dataUrl.length > 200;
-      if (!ok) {
+      if (!supported.some((p) => dataUrl.startsWith(p)) || dataUrl.length < 200) {
         reject(new Error('画像の変換に失敗しました（JPEG/PNG/WebPのみ対応）'));
         return;
       }
@@ -71,10 +68,5 @@ export async function uploadImage(
   return dataUrl;
 }
 
-export async function deleteImage(_storagePath: string): Promise<void> {
-  // No-op: images are base64, nothing to delete
-}
-
-export function getStoragePathFromUrl(_url: string): string {
-  return '';
-}
+export async function deleteImage(_storagePath: string): Promise<void> { /* no-op */ }
+export function getStoragePathFromUrl(_url: string): string { return ''; }

@@ -114,25 +114,58 @@ export default function UploadPage() {
         .filter((s) => s?.uploaded && s.url)
         .map((s) => s!.url!);
 
-      const response = await fetch('/api/diagnose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // Safety: measure total base64 size before fetch (iOS Safari has a ~512KB limit)
+      const totalBytes = imageUrls.reduce((sum, url) => sum + url.length, 0);
+      if (totalBytes > 400_000) {
+        throw new Error(
+          `画像データが大きすぎます（${Math.round(totalBytes / 1024)}KB）。` +
+          '写真を撮り直すか、別の写真をお試しください。'
+        );
+      }
+
+      // Serialize body separately so we can catch stringify errors
+      let bodyStr: string;
+      try {
+        bodyStr = JSON.stringify({
           userProfile,
           imageUrls,
           currentDate: new Date().toISOString().split('T')[0],
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Diagnosis failed');
+        });
+      } catch {
+        throw new Error('リクエストのシリアライズに失敗しました。');
       }
 
-      const result = await response.json();
+      // Fetch with explicit error handling for network-level failures
+      let response: Response;
+      try {
+        response = await fetch('/api/diagnose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: bodyStr,
+        });
+      } catch (fetchErr: any) {
+        const msg = fetchErr?.message ?? String(fetchErr);
+        throw new Error(`通信エラーが発生しました。ネットワークを確認してください。（${msg}）`);
+      }
+
+      if (!response.ok) {
+        let errMsg = '診断に失敗しました';
+        try {
+          const errJson = await response.json();
+          errMsg = errJson.error || errMsg;
+        } catch { /* ignore json parse error */ }
+        throw new Error(errMsg);
+      }
+
+      let result: any;
+      try {
+        result = await response.json();
+      } catch {
+        throw new Error('サーバーの返答を解析できませんでした。再度お試しください。');
+      }
+
       setCurrentDiagnosis(result);
 
-      // Store uploaded images in context
       const uploadedImages: UploadedImage[] = Object.values(slots)
         .filter((s) => s?.uploaded)
         .map((s) => ({
