@@ -1,8 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
@@ -38,7 +36,7 @@ const scoreItems = [
   { key: 'marketValue', label: '婚活市場評価', max: 15 },
 ] as const;
 
-export default function DiagnosisPage() {
+function DiagnosisContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useAuth();
@@ -340,5 +338,13 @@ export default function DiagnosisPage() {
         </div>
       </div>
     </AuthGuard>
+  );
+}
+
+export default function DiagnosisPage() {
+  return (
+    <Suspense>
+      <DiagnosisContent />
+    </Suspense>
   );
 }
