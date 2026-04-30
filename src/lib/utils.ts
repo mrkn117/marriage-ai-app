@@ -95,6 +95,7 @@ export function getScoreLevel(score: number): {
 }
 
 export function formatCurrency(amount: number): string {
+  if (!isFinite(amount) || isNaN(amount)) return '—';
   return new Intl.NumberFormat('ja-JP', {
     style: 'currency',
     currency: 'JPY',
@@ -105,15 +106,6 @@ export function formatCurrency(amount: number): string {
 export function truncate(str: string, length: number): string {
   if (str.length <= length) return str;
   return str.slice(0, length) + '...';
-}
-
-export function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-  });
 }
 
 export function getGenderLabel(gender: string): string {

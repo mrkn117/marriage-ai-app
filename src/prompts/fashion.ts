@@ -57,10 +57,11 @@ export function buildFashionUserPrompt(
   dateType: string
 ): string {
   const gender = getGenderLabel(user.gender);
+  const fashionBudget = user.fashionBudget ?? 20000;
   const budgets = {
-    'high-brand': user.fashionBudget * 3,
-    'cost-effective': user.fashionBudget,
-    budget: Math.round(user.fashionBudget * 0.4),
+    'high-brand': fashionBudget * 3,
+    'cost-effective': fashionBudget,
+    budget: Math.round(fashionBudget * 0.4),
   };
 
   return `## 対象者情報
@@ -70,7 +71,7 @@ export function buildFashionUserPrompt(
 - 居住エリア: ${user.residenceArea}
 - 希望する相手像: ${user.desiredPartner}
 - 服の好み: ${user.fashionStyle}
-- 通常ファッション予算: ${formatCurrency(user.fashionBudget)}
+- 通常ファッション予算: ${formatCurrency(fashionBudget)}
 
 ## デート条件
 - 日付: ${currentDate}（${season}）
