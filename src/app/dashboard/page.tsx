@@ -70,18 +70,20 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return;
+    let mounted = true;
     Promise.race([
       getUserDiagnoses(user.uid, 3),
       new Promise<DiagnosisResult[]>((_, reject) =>
         setTimeout(() => reject(new Error('Firestore timeout')), 10_000)
       ),
     ])
-      .then(setRecentDiagnoses)
+      .then((data) => { if (mounted) setRecentDiagnoses(data); })
       .catch((err) => {
         console.error('Failed to load diagnoses:', err);
-        setLoadError(true);
+        if (mounted) setLoadError(true);
       })
-      .finally(() => setLoading(false));
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
   }, [user]);
 
   const latestDiagnosis = recentDiagnoses[0];

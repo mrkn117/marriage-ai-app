@@ -118,8 +118,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateUserProfile = async (data: Partial<UserProfile>) => {
     if (!user) throw new Error('Not authenticated');
     await saveUserProfile(user.uid, data);
-    const updated = await getUserProfile(user.uid);
-    setUserProfile(updated);
+    try {
+      const updated = await Promise.race([
+        getUserProfile(user.uid),
+        new Promise<null>((_, reject) =>
+          setTimeout(() => reject(new Error('Profile fetch timeout')), 8_000)
+        ),
+      ]);
+      setUserProfile(updated);
+    } catch (e) {
+      console.error('Failed to refresh profile after update:', e);
+    }
   };
 
   const deleteAccount = async () => {

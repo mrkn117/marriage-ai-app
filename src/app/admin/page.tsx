@@ -22,16 +22,26 @@ export default function AdminPage() {
   useEffect(() => {
     if (!user?.email) return;
     const email = user.email;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20_000);
     fetch('/api/admin', {
       headers: { 'x-admin-email': email },
+      signal: controller.signal,
     })
       .then((r) => {
         if (!r.ok) throw new Error(`アクセス拒否（HTTP ${r.status}）`);
         return r.json();
       })
       .then(setData)
-      .catch((err: any) => setError(err?.message ?? '読み込みに失敗しました'))
-      .finally(() => setLoading(false));
+      .catch((err: any) => {
+        if (err?.name === 'AbortError') return;
+        setError(err?.message ?? '読み込みに失敗しました');
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        setLoading(false);
+      });
+    return () => { controller.abort(); clearTimeout(timer); };
   }, [user]);
 
   if (loading) {

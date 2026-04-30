@@ -44,10 +44,10 @@ function DiagnosisContent() {
   const diagnosisId = searchParams.get('id');
 
   useEffect(() => {
+    let mounted = true;
     const load = async () => {
       if (currentDiagnosis && (!diagnosisId || diagnosisId === currentDiagnosis.id)) {
-        setResult(currentDiagnosis);
-        setLoading(false);
+        if (mounted) { setResult(currentDiagnosis); setLoading(false); }
         return;
       }
       if (diagnosisId) {
@@ -58,15 +58,16 @@ function DiagnosisContent() {
               setTimeout(() => reject(new Error('Firestore timeout')), 10_000)
             ),
           ]);
-          setResult(r);
+          if (mounted) setResult(r);
         } catch (e: any) {
           console.error('Failed to load diagnosis:', e);
-          setLoadError(true);
+          if (mounted) setLoadError(true);
         }
       }
-      setLoading(false);
+      if (mounted) setLoading(false);
     };
     load();
+    return () => { mounted = false; };
   }, [diagnosisId, currentDiagnosis]);
 
   if (loading) {
