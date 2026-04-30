@@ -4,10 +4,9 @@ import { buildDatePlanSystemPrompt, buildDatePlanUserPrompt } from '@/prompts/da
 import { saveDatePlan } from '@/lib/firestore';
 import type { DatePlanRequest, DatePlan } from '@/types';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 export async function POST(req: NextRequest) {
   try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const body: DatePlanRequest = await req.json();
     const { userProfile, area, budget, timeSlot, isFirstDate, partnerDescription } = body;
 

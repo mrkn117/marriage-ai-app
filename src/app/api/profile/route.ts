@@ -5,10 +5,9 @@ import { saveGeneratedProfile } from '@/lib/firestore';
 import { getGenderLabel } from '@/lib/utils';
 import type { UserProfile, GeneratedProfile } from '@/types';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 export async function POST(req: NextRequest) {
   try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const { userProfile }: { userProfile: UserProfile } = await req.json();
 
     const userPrompt = `## プロフィール作成依頼

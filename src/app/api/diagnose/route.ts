@@ -4,10 +4,9 @@ import { buildDiagnosisSystemPrompt, buildDiagnosisUserPrompt } from '@/prompts/
 import { saveDiagnosisResult } from '@/lib/firestore';
 import type { DiagnoseRequest, DiagnosisResult, DiagnosisScores } from '@/types';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 export async function POST(req: NextRequest) {
   try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const body: DiagnoseRequest = await req.json();
     const { userProfile, imageUrls, currentDate } = body;
 
