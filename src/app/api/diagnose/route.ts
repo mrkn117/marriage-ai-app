@@ -80,12 +80,13 @@ export async function POST(req: NextRequest) {
       thisWeekAction: parsed.thisWeekAction ?? '',
       oneMonthAction: parsed.oneMonthAction ?? '',
       createdAt: new Date(),
-      imageUrls,
+      imageUrls: [],  // base64 URLs are too large for Firestore; store empty
     };
 
     const id = await saveDiagnosisResult(diagnosisData);
 
-    return NextResponse.json({ id, ...diagnosisData });
+    // Return imageUrls in response (for in-memory display) but don't persist base64 to Firestore
+    return NextResponse.json({ id, ...diagnosisData, imageUrls });
   } catch (err: any) {
     console.error('Diagnosis error:', err);
     return NextResponse.json(
