@@ -21,15 +21,16 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!user?.email) return;
+    const email = user.email;
     fetch('/api/admin', {
-      headers: { 'x-admin-email': user.email },
+      headers: { 'x-admin-email': email },
     })
       .then((r) => {
-        if (!r.ok) throw new Error('Unauthorized');
+        if (!r.ok) throw new Error(`アクセス拒否（HTTP ${r.status}）`);
         return r.json();
       })
       .then(setData)
-      .catch((err) => setError(err.message))
+      .catch((err: any) => setError(err?.message ?? '読み込みに失敗しました'))
       .finally(() => setLoading(false));
   }, [user]);
 
@@ -57,9 +58,9 @@ export default function AdminPage() {
     );
   }
 
-  const avgScore = data?.diagnoses.length
+  const avgScore = data?.diagnoses?.length
     ? Math.round(
-        data.diagnoses.reduce((sum: number, d: any) => sum + (d.scores?.total ?? 0), 0) /
+        (data.diagnoses?.reduce((sum: number, d: any) => sum + (d.scores?.total ?? 0), 0) ?? 0) /
         data.diagnoses.length
       )
     : 0;
@@ -76,12 +77,12 @@ export default function AdminPage() {
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
             {[
-              { label: '総ユーザー数', value: data?.users.length ?? 0, icon: Users, color: 'text-blue-400' },
-              { label: '総診断数', value: data?.diagnoses.length ?? 0, icon: BarChart2, color: 'text-green-400' },
+              { label: '総ユーザー数', value: data?.users?.length ?? 0, icon: Users, color: 'text-blue-400' },
+              { label: '総診断数', value: data?.diagnoses?.length ?? 0, icon: BarChart2, color: 'text-green-400' },
               { label: '平均スコア', value: `${avgScore}点`, icon: BarChart2, color: 'text-yellow-400' },
               {
                 label: '低スコア（<50）',
-                value: data?.diagnoses.filter((d: any) => (d.scores?.total ?? 0) < 50).length ?? 0,
+                value: data?.diagnoses?.filter((d: any) => (d.scores?.total ?? 0) < 50).length ?? 0,
                 icon: AlertTriangle,
                 color: 'text-red-400'
               },

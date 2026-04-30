@@ -129,7 +129,7 @@ async function handleProfile(req: NextRequest): Promise<NextResponse> {
   }
 
   const data: Omit<GeneratedProfile, 'id'> = {
-    userId: userProfile.uid,
+    userId: userProfile.uid ?? '',
     title: String(parsed.title ?? ''),
     selfIntroduction: String(parsed.selfIntroduction ?? ''),
     appealPoints: Array.isArray(parsed.appealPoints) ? parsed.appealPoints : [],

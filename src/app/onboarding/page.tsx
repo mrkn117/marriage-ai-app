@@ -137,8 +137,8 @@ export default function OnboardingPage() {
       await updateUserProfile({ ...data, updatedAt: new Date() });
       toast.success('プロフィールを保存しました！');
       router.push('/upload');
-    } catch (err) {
-      toast.error('保存に失敗しました');
+    } catch (err: any) {
+      toast.error(err?.message ?? '保存に失敗しました。再度お試しください');
     } finally {
       setSaving(false);
     }

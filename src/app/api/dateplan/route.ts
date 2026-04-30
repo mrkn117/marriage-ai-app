@@ -107,7 +107,7 @@ async function handleDatePlan(req: NextRequest): Promise<NextResponse> {
   }
 
   const data: Omit<DatePlan, 'id'> = {
-    userId: userProfile.uid,
+    userId: userProfile.uid ?? '',
     planName: String(parsed.planName ?? 'デートプラン'),
     area,
     totalBudget: budget,

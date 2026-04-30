@@ -105,7 +105,7 @@ async function handleFashion(req: NextRequest): Promise<NextResponse> {
   }
 
   const data: Omit<FashionSuggestion, 'id'> = {
-    userId: userProfile.uid,
+    userId: userProfile.uid ?? '',
     season,
     temperature: String(temperature),
     weather,

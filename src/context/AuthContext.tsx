@@ -70,28 +70,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
-    const profile = await getUserProfile(result.user.uid);
-    if (!profile) {
-      await saveUserProfile(result.user.uid, {
-        uid: result.user.uid,
-        email: result.user.email ?? '',
-        nickname: result.user.displayName ?? 'ユーザー',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as Partial<UserProfile>);
+    try {
+      const profile = await getUserProfile(result.user.uid);
+      if (!profile) {
+        await saveUserProfile(result.user.uid, {
+          uid: result.user.uid,
+          email: result.user.email ?? '',
+          nickname: result.user.displayName ?? 'ユーザー',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as Partial<UserProfile>);
+      }
+    } catch (e) {
+      console.error('Failed to save Google profile:', e);
     }
   };
 
   const register = async (email: string, password: string, nickname: string) => {
     const result = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(result.user, { displayName: nickname });
-    await saveUserProfile(result.user.uid, {
-      uid: result.user.uid,
-      email,
-      nickname,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as Partial<UserProfile>);
+    try {
+      await saveUserProfile(result.user.uid, {
+        uid: result.user.uid,
+        email,
+        nickname,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as Partial<UserProfile>);
+    } catch (e) {
+      console.error('Failed to save profile after register:', e);
+    }
   };
 
   const logout = async () => {
