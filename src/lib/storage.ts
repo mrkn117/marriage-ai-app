@@ -6,9 +6,9 @@ export interface UploadProgress {
   error?: string;
 }
 
-// iOS Safari has a fetch body size limit (~512KB).
-// Keep max 512px so that 2 images stay comfortably under 200KB total.
-function compressImage(file: File, maxPx = 512, quality = 0.75): Promise<string> {
+// Keep max 640px at quality 0.82 — gives better AI analysis accuracy
+// while staying well under the 400KB total base64 limit (≈200KB per image).
+function compressImage(file: File, maxPx = 640, quality = 0.82): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
