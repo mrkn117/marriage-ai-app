@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { buildDiagnosisSystemPrompt, buildDiagnosisUserPrompt } from '@/prompts/diagnosis';
-import { saveDiagnosisResult } from '@/lib/firestore';
 import type { DiagnoseRequest, DiagnosisResult, DiagnosisScores } from '@/types';
 
-// OpenAI accepts only these image formats
+// NOTE: Firebase is NOT imported at the top level.
+// We use dynamic import inside the handler so that Firebase initialization
+// errors (which happen at module-load time) are caught in try-catch.
+
 const SUPPORTED_PREFIXES = [
   'data:image/jpeg;base64,',
   'data:image/jpg;base64,',
@@ -13,14 +15,11 @@ const SUPPORTED_PREFIXES = [
   'data:image/webp;base64,',
 ];
 
-// Remove whitespace from base64 data (some browsers/iOS may add line breaks)
 function sanitizeDataUrl(url: string): string {
   if (!url.startsWith('data:image/')) return url;
-  const commaIdx = url.indexOf(',');
-  if (commaIdx === -1) return url;
-  const header = url.slice(0, commaIdx + 1);
-  const data = url.slice(commaIdx + 1).replace(/\s+/g, '');
-  return header + data;
+  const comma = url.indexOf(',');
+  if (comma === -1) return url;
+  return url.slice(0, comma + 1) + url.slice(comma + 1).replace(/\s+/g, '');
 }
 
 function isOpenAICompatible(url: string): boolean {
@@ -29,15 +28,11 @@ function isOpenAICompatible(url: string): boolean {
 }
 
 function parseJson(content: string): any {
-  // Strategy 1: direct parse
   try { return JSON.parse(content); } catch { /* next */ }
-  // Strategy 2: ```json block
   const m2 = content.match(/```json\s*([\s\S]*?)\s*```/);
   if (m2) try { return JSON.parse(m2[1]); } catch { /* next */ }
-  // Strategy 3: any ``` block
   const m3 = content.match(/```\s*([\s\S]*?)\s*```/);
   if (m3) try { return JSON.parse(m3[1]); } catch { /* next */ }
-  // Strategy 4: outermost { }
   const start = content.indexOf('{');
   const end = content.lastIndexOf('}');
   if (start !== -1 && end > start) {
@@ -47,9 +42,20 @@ function parseJson(content: string): any {
 }
 
 export async function POST(req: NextRequest) {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  // ── Global catch-all: any uncaught error returns structured JSON ──
+  try {
+    return await handleDiagnose(req);
+  } catch (err: any) {
+    console.error('[diagnose] Unhandled error:', err);
+    return NextResponse.json(
+      { error: `予期しないエラー: ${err?.message ?? String(err)}` },
+      { status: 500 }
+    );
+  }
+}
 
-  // Step 1: Parse request
+async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
+  // ── 1. Parse request body ──────────────────────────────────────────
   let body: DiagnoseRequest;
   try {
     body = await req.json();
@@ -66,21 +72,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'プロフィールが必要です' }, { status: 400 });
   }
 
-  // Step 2: Sanitize and validate image URLs
-  const validUrls = imageUrls
-    .map(sanitizeDataUrl)
-    .filter(isOpenAICompatible);
+  // ── 2. Sanitize and validate image URLs ───────────────────────────
+  const validUrls = imageUrls.map(sanitizeDataUrl).filter(isOpenAICompatible);
 
   if (validUrls.length === 0) {
     return NextResponse.json(
-      { error: '対応していない画像形式です（JPEG/PNG/WebPで撮影してください）' },
+      { error: '非対応の画像形式です（JPEG/PNG/WebPで撮影してください）' },
       { status: 400 }
     );
   }
 
-  // Step 3: Call OpenAI
+  // ── 3. Call OpenAI Vision API ─────────────────────────────────────
   let completion;
   try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
@@ -88,7 +93,10 @@ export async function POST(req: NextRequest) {
         {
           role: 'user',
           content: [
-            { type: 'text', text: buildDiagnosisUserPrompt(userProfile, validUrls, currentDate) },
+            {
+              type: 'text',
+              text: buildDiagnosisUserPrompt(userProfile, validUrls, currentDate),
+            },
             ...validUrls.map((url) => ({
               type: 'image_url' as const,
               image_url: { url, detail: 'auto' as const },
@@ -101,33 +109,35 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error('[diagnose] OpenAI error:', err?.message, err?.status);
-    const msg = err?.message ?? 'OpenAI APIエラー';
-    return NextResponse.json({ error: `AI呼び出し失敗: ${msg}` }, { status: 500 });
-  }
-
-  const choice = completion.choices[0];
-  const content = choice?.message?.content ?? '';
-  const finishReason = choice?.finish_reason;
-
-  // Step 4: Handle content filter / empty response
-  if (finishReason === 'content_filter' || !content.trim()) {
     return NextResponse.json(
-      { error: '写真の内容をAIが処理できませんでした。本人のみが写った写真をお使いください。' },
-      { status: 422 }
-    );
-  }
-
-  // Step 5: Parse JSON
-  const parsed = parseJson(content);
-  if (!parsed) {
-    console.error('[diagnose] Parse failed. Raw content:', content.slice(0, 300));
-    return NextResponse.json(
-      { error: 'AIの返答を解析できませんでした。もう一度お試しください。' },
+      { error: `AI呼び出し失敗: ${err?.message ?? 'OpenAI APIエラー'}` },
       { status: 500 }
     );
   }
 
-  // Step 6: Build and normalize scores
+  const choice = completion.choices[0];
+  const rawContent = choice?.message?.content ?? '';
+  const finishReason = choice?.finish_reason;
+
+  // ── 4. Handle content filter / empty response ─────────────────────
+  if (finishReason === 'content_filter' || !rawContent.trim()) {
+    return NextResponse.json(
+      { error: 'AIが画像を処理できませんでした。本人のみが写った写真をお使いください。' },
+      { status: 422 }
+    );
+  }
+
+  // ── 5. Parse JSON response ────────────────────────────────────────
+  const parsed = parseJson(rawContent);
+  if (!parsed) {
+    console.error('[diagnose] Parse failed. Content:', rawContent.slice(0, 300));
+    return NextResponse.json(
+      { error: 'AIの返答を解析できませんでした。再度お試しください。' },
+      { status: 500 }
+    );
+  }
+
+  // ── 6. Build normalized scores ────────────────────────────────────
   const scores: DiagnosisScores = {
     firstImpression: Math.min(20, Math.max(0, Number(parsed.scores?.firstImpression) || 10)),
     cleanliness:     Math.min(15, Math.max(0, Number(parsed.scores?.cleanliness)     || 8)),
@@ -157,16 +167,15 @@ export async function POST(req: NextRequest) {
     imageUrls: [],
   };
 
-  // Step 7: Save to Firestore
-  let id: string;
+  // ── 7. Save to Firestore (non-fatal) ──────────────────────────────
+  // Dynamic import so Firebase init errors don't crash the whole route.
+  let id = `local_${Date.now()}`;
   try {
+    const { saveDiagnosisResult } = await import('@/lib/firestore');
     id = await saveDiagnosisResult(diagnosisData);
   } catch (err: any) {
-    console.error('[diagnose] Firestore error:', err?.message);
-    return NextResponse.json(
-      { error: `データ保存失敗: ${err?.message ?? 'Firestoreエラー'}` },
-      { status: 500 }
-    );
+    // Firestore failure is logged but does NOT block the diagnosis result.
+    console.error('[diagnose] Firestore save failed (non-fatal):', err?.message);
   }
 
   return NextResponse.json({ id, ...diagnosisData, imageUrls: validUrls });
