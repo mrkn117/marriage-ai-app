@@ -99,6 +99,12 @@ export default function OnboardingPage() {
       fashionBudget: 20000,
       dateBudget: 10000,
       annualIncome: 300,
+      occupation: '会社員',
+      residenceArea: '',
+      nickname: '',
+      marriageGoal: '',
+      desiredPartner: '',
+      dateArea: '',
     },
   });
 
