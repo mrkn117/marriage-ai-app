@@ -12,6 +12,7 @@ import {
   sendPasswordResetEmail,
   updateProfile,
   deleteUser,
+  signInAnonymously,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { saveUserProfile, getUserProfile, deleteUserData } from '@/lib/firestore';
@@ -40,16 +41,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser) {
+      if (!firebaseUser) {
+        // Auto sign in anonymously
         try {
-          const profile = await getUserProfile(firebaseUser.uid);
-          setUserProfile(profile);
+          await signInAnonymously(auth);
         } catch (e) {
-          console.error('Failed to load profile:', e);
+          console.error('Anonymous sign in failed:', e);
+          setLoading(false);
         }
-      } else {
-        setUserProfile(null);
+        return;
+      }
+      setUser(firebaseUser);
+      try {
+        const profile = await getUserProfile(firebaseUser.uid);
+        setUserProfile(profile);
+      } catch (e) {
+        console.error('Failed to load profile:', e);
       }
       setLoading(false);
     });

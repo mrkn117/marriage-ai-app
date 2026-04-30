@@ -16,11 +16,7 @@ export function AuthGuard({ children, requireProfile = false }: AuthGuardProps) 
 
   useEffect(() => {
     if (loading) return;
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-    if (requireProfile && !userProfile?.age) {
+    if (requireProfile && user && !userProfile?.age) {
       router.push('/onboarding');
     }
   }, [user, userProfile, loading, router, requireProfile]);
@@ -39,7 +35,6 @@ export function AuthGuard({ children, requireProfile = false }: AuthGuardProps) 
     );
   }
 
-  if (!user) return null;
   if (requireProfile && !userProfile?.age) return null;
 
   return <>{children}</>;
