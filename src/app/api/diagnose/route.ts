@@ -258,7 +258,7 @@ async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
     strengths:       String(parsed.strengths       ?? ''),
     weaknesses:      String(parsed.weaknesses      ?? ''),
     socialImpression: String(parsed.socialImpression ?? ''),
-    incomeAssessment: String(parsed.incomeAssessment ?? ''),
+    incomeAssessment: String(parsed.incomeAssessment ?? '') || buildIncomeAssessment(userProfile, scores.total),
     improvementPriority: Array.isArray(parsed.improvementPriority)
       ? parsed.improvementPriority.map(String)
       : [],
@@ -283,4 +283,106 @@ async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
   }
 
   return NextResponse.json({ id, ...diagnosisData });
+}
+
+function buildIncomeAssessment(profile: any, appearanceScore: number): string {
+  const income = Number(profile.annualIncome) || 0;
+  const age = Number(profile.age) || 25;
+  const height = Number(profile.height) || 0;
+  const isMale = profile.gender === 'male';
+  const occupation = profile.occupation || '未入力';
+
+  // ── 年収評価 ──────────────────────────────────────────────────────
+  const avgIncome = isMale
+    ? (age < 30 ? 350 : age < 40 ? 450 : age < 50 ? 550 : 500)
+    : (age < 30 ? 280 : age < 40 ? 350 : age < 50 ? 380 : 360);
+
+  let incomeTier: string;
+  let incomeText: string;
+
+  if (income <= 0) {
+    incomeTier = '未入力';
+    incomeText = `【年収】未入力\n婚活アプリでは年収を開示しているプロフィールの方がマッチング率が高い傾向があります。開示を検討してください。`;
+  } else {
+    incomeTier = isMale
+      ? (income >= 800 ? 'S' : income >= 600 ? 'A' : income >= 400 ? 'B' : income >= 300 ? 'C' : 'D')
+      : (income >= 700 ? 'S' : income >= 500 ? 'A' : income >= 350 ? 'B' : income >= 250 ? 'C' : 'D');
+
+    const diff = income - avgIncome;
+    const diffStr = diff >= 0
+      ? `平均より${diff}万円上（+${Math.round((diff / avgIncome) * 100)}%）`
+      : `平均より${Math.abs(diff)}万円下（${Math.round((diff / avgIncome) * 100)}%）`;
+
+    const tierComment: Record<string, string> = {
+      S: '婚活市場で非常に有利。高収入として大きな強みになります。',
+      A: '平均を大きく上回る収入で、婚活での訴求力は高いです。',
+      B: '平均的な収入水準。外見や人柄でカバーできるレベルです。',
+      C: '同年代平均を下回っています。収入アップへの取り組みが重要です。',
+      D: '婚活においてこの収入水準は不利になりやすいです。収入改善または他の強みでカバーが必要です。',
+    };
+
+    incomeText = `【年収】${income}万円（ティア${incomeTier}）\n同年代${isMale ? '男性' : '女性'}平均：${avgIncome}万円 → ${diffStr}\n${tierComment[incomeTier]}`;
+  }
+
+  // ── 身長評価 ──────────────────────────────────────────────────────
+  let heightText: string;
+  if (height <= 0) {
+    heightText = `【身長】未入力\n身長も開示することで相手に安心感を与えられます。`;
+  } else {
+    let heightTier: string;
+    let heightComment: string;
+    if (isMale) {
+      heightTier = height >= 180 ? 'S' : height >= 175 ? 'A' : height >= 170 ? 'B' : height >= 165 ? 'C' : 'D';
+      const comments: Record<string, string> = {
+        S: '180cm以上は婚活で非常に有利な身長です。',
+        A: '175cm以上は平均を超えており、女性から好印象を持たれやすいです。',
+        B: '日本人男性平均（約170cm）程度。特に有利でも不利でもありません。',
+        C: '165〜170cmは平均をやや下回ります。他の要素で補うことが重要です。',
+        D: '165cm未満は婚活で不利になる場合があります。他の強みを最大化してください。',
+      };
+      heightComment = comments[heightTier];
+    } else {
+      heightTier = height >= 168 ? 'A' : height >= 162 ? 'B' : height >= 155 ? 'C' : 'D';
+      const comments: Record<string, string> = {
+        A: '168cm以上は女性として平均を上回る身長で、スタイルが良い印象を与えます。',
+        B: '162〜168cmは標準的な身長です。',
+        C: '155〜162cmは日本人女性の平均的な身長帯です。',
+        D: '155cm未満。身長より表情や雰囲気でアピールしましょう。',
+      };
+      heightComment = comments[heightTier];
+    }
+    heightText = `【身長】${height}cm（ティア${heightTier}）\n${heightComment}`;
+  }
+
+  // ── 職業評価 ──────────────────────────────────────────────────────
+  const highAppealOccupations = ['医師', '弁護士', '公認会計士', '外資系', 'コンサル', 'エンジニア', '公務員', '教員', '看護師', '薬剤師'];
+  const hasHighAppeal = highAppealOccupations.some(o => occupation.includes(o));
+  const occupationText = `【職業】${occupation}\n${
+    occupation === '未入力' ? '職業を開示することで信頼性が上がります。' :
+    hasHighAppeal ? '婚活市場での訴求力が高い職業です。プロフィールに積極的に記載しましょう。' :
+    '職業自体よりも、仕事への姿勢や将来性をアピールすることが大切です。'
+  }`;
+
+  // ── 総合評価 ──────────────────────────────────────────────────────
+  const incomeScore = incomeTier === 'S' ? 3 : incomeTier === 'A' ? 2 : incomeTier === 'B' ? 1 : incomeTier === 'C' ? 0 : -1;
+  const heightScore = isMale
+    ? (height >= 180 ? 2 : height >= 175 ? 1 : height >= 170 ? 0 : -1)
+    : (height >= 162 ? 1 : 0);
+  const combinedScore = appearanceScore + incomeScore * 5 + heightScore * 3;
+
+  let overallTier: string;
+  let overallComment: string;
+  if (combinedScore >= 75) {
+    overallTier = '上位';
+    overallComment = '外見・収入・身長のバランスが良く、婚活アプリで上位層に位置します。理想のパートナーを狙える状況です。';
+  } else if (combinedScore >= 55) {
+    overallTier = '中位';
+    overallComment = '平均的な競争力です。外見か収入どちらかを強化することで上位層に入れる可能性があります。';
+  } else {
+    overallTier = '下位';
+    overallComment = '現状は競争力が低い状況です。外見改善と収入アップの両面から取り組む必要があります。現実的なターゲット設定も重要です。';
+  }
+  const overallText = `【婚活市場での総合評価】${overallTier}\n${overallComment}`;
+
+  return [incomeText, heightText, occupationText, overallText].join('\n\n');
 }
