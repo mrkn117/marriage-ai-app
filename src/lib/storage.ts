@@ -46,15 +46,28 @@ function readExifOrientation(buffer: ArrayBuffer): number {
   return 1;
 }
 
+// Detect HEIC by ISO Base Media ftyp box — catches .jpg-renamed HEIC files that slip past MIME checks.
+async function isHeicByHeader(file: File): Promise<boolean> {
+  try {
+    const buf = await file.slice(0, 12).arrayBuffer();
+    if (buf.byteLength < 12) return false;
+    const v = new Uint8Array(buf);
+    // bytes 4-7: 'ftyp' (ISO Base Media container)
+    if (v[4] === 0x66 && v[5] === 0x74 && v[6] === 0x79 && v[7] === 0x70) {
+      const brand = String.fromCharCode(v[8], v[9], v[10], v[11]).toLowerCase();
+      return /^(heic|heix|hevc|hevx|heim|heis|hevm|hevs|mif1|msf1)/.test(brand);
+    }
+  } catch { /* ignore */ }
+  return false;
+}
+
 // 512px at quality 0.72 keeps each image ≈15–60KB in base64 (well under the 600KB total limit)
 // while providing enough resolution for GPT-4o "auto" detail analysis.
 async function compressImage(file: File, maxPx = 512, quality = 0.72): Promise<string> {
   // HEIC/HEIF cannot be decoded by canvas in Chrome/Firefox/Edge — Safari auto-converts on iOS.
-  if (
-    file.type === 'image/heic' ||
-    file.type === 'image/heif' ||
-    /\.(heic|heif)$/i.test(file.name)
-  ) {
+  const heicByMime = file.type === 'image/heic' || file.type === 'image/heif' || /\.(heic|heif)$/i.test(file.name);
+  const heicByHeader = !heicByMime && await isHeicByHeader(file);
+  if (heicByMime || heicByHeader) {
     throw new Error(
       'HEIC形式は非対応です。' +
       'iPhoneの場合：設定→カメラ→フォーマット→「互換性優先」に変更するとJPEGで保存されます'
@@ -64,7 +77,7 @@ async function compressImage(file: File, maxPx = 512, quality = 0.72): Promise<s
   // Read EXIF orientation for JPEG files to fix rotation on browsers that don't auto-apply it.
   // Modern iOS Safari and Chrome 81+ auto-apply EXIF, old Android WebView does not.
   let exifOrientation = 1;
-  if (file.type.includes('jpeg') || /\.jpe?g$/i.test(file.name)) {
+  if (file.type.includes('jpeg') || file.type === '' || /\.jpe?g$/i.test(file.name)) {
     try {
       const header = await file.slice(0, 65536).arrayBuffer();
       exifOrientation = readExifOrientation(header);
@@ -129,7 +142,13 @@ async function compressImage(file: File, maxPx = 512, quality = 0.72): Promise<s
       }
 
       // Produce JPEG; strip whitespace from base64 payload
-      let dataUrl = canvas.toDataURL('image/jpeg', quality);
+      let dataUrl: string;
+      try {
+        dataUrl = canvas.toDataURL('image/jpeg', quality);
+      } catch {
+        reject(new Error('画像の変換に失敗しました。別の写真をお試しください。'));
+        return;
+      }
       const comma = dataUrl.indexOf(',');
       if (comma !== -1) {
         dataUrl =

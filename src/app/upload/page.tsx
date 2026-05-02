@@ -421,6 +421,8 @@ function DropZoneSlot({ slot, slotData, onDrop, onRemove }: DropZoneSlotProps) {
         'image/jpeg': ['.jpg', '.jpeg'],
         'image/png': ['.png'],
         'image/webp': ['.webp'],
+        // Empty MIME type occurs on some iOS file pickers — accept by extension only
+        '': ['.jpg', '.jpeg', '.png', '.webp'],
       },
     maxFiles: 1,
     maxSize: 10 * 1024 * 1024,
