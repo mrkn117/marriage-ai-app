@@ -364,20 +364,21 @@ function buildIncomeAssessment(profile: any, appearanceScore: number): string {
   }`;
 
   // ── 総合評価 ──────────────────────────────────────────────────────
-  const incomeScore = incomeTier === 'S' ? 3 : incomeTier === 'A' ? 2 : incomeTier === 'B' ? 1 : incomeTier === 'C' ? 0 : -1;
+  // income: S=20, A=12, B=4, C=0, D=-8 / height male: S=10, A=6, B=0, C=-4, D=-8
+  const incomeScore = incomeTier === 'S' ? 20 : incomeTier === 'A' ? 12 : incomeTier === 'B' ? 4 : incomeTier === 'C' ? 0 : -8;
   const heightScore = isMale
-    ? (height >= 180 ? 2 : height >= 175 ? 1 : height >= 170 ? 0 : -1)
-    : (height >= 162 ? 1 : 0);
-  const combinedScore = appearanceScore + incomeScore * 5 + heightScore * 3;
+    ? (height >= 180 ? 10 : height >= 175 ? 6 : height >= 170 ? 0 : height >= 165 ? -4 : -8)
+    : (height >= 162 ? 4 : 0);
+  const combinedScore = appearanceScore + incomeScore + heightScore;
 
   let overallTier: string;
   let overallComment: string;
-  if (combinedScore >= 75) {
+  if (combinedScore >= 90) {
     overallTier = '上位';
-    overallComment = '外見・収入・身長のバランスが良く、婚活アプリで上位層に位置します。理想のパートナーを狙える状況です。';
-  } else if (combinedScore >= 55) {
+    overallComment = '外見・収入・身長のバランスが優れており、婚活アプリで上位層に位置します。理想のパートナーを狙える状況です。';
+  } else if (combinedScore >= 65) {
     overallTier = '中位';
-    overallComment = '平均的な競争力です。外見か収入どちらかを強化することで上位層に入れる可能性があります。';
+    overallComment = '平均的な競争力です。外見か収入のどちらかを強化することで上位層に入れる可能性があります。';
   } else {
     overallTier = '下位';
     overallComment = '現状は競争力が低い状況です。外見改善と収入アップの両面から取り組む必要があります。現実的なターゲット設定も重要です。';
