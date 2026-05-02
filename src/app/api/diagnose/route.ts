@@ -258,6 +258,7 @@ async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
     strengths:       String(parsed.strengths       ?? ''),
     weaknesses:      String(parsed.weaknesses      ?? ''),
     socialImpression: String(parsed.socialImpression ?? ''),
+    incomeAssessment: String(parsed.incomeAssessment ?? ''),
     improvementPriority: Array.isArray(parsed.improvementPriority)
       ? parsed.improvementPriority.map(String)
       : [],

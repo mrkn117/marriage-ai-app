@@ -15,6 +15,7 @@ import {
   Shirt,
   MapPin,
   Loader2,
+  Banknote,
 } from 'lucide-react';
 import { useDiagnosis } from '@/context/DiagnosisContext';
 import { AuthGuard } from '@/components/auth/AuthGuard';
@@ -255,11 +256,30 @@ function DiagnosisContent() {
             </Card>
           </motion.div>
 
+          {/* Income Assessment */}
+          {result.incomeAssessment && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+            >
+              <Card variant="glass" className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Banknote className="w-5 h-5 text-yellow-400" />
+                  <h3 className="text-white font-semibold">婚活市場での価値評価</h3>
+                </div>
+                <p className="text-white/70 text-sm leading-relaxed whitespace-pre-line">
+                  {result.incomeAssessment}
+                </p>
+              </Card>
+            </motion.div>
+          )}
+
           {/* Market View */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 }}
+            transition={{ delay: 0.4 }}
           >
             <Card variant="glass" className="mb-6">
               <div className="flex items-center gap-2 mb-3">

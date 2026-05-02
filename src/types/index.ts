@@ -47,6 +47,7 @@ export interface DiagnosisResult {
   strengths: string;
   weaknesses: string;
   socialImpression: string;
+  incomeAssessment: string;
   improvementPriority: string[];
   thisWeekAction: string;
   oneMonthAction: string;
