@@ -47,7 +47,7 @@ Return only valid JSON with the exact structure requested. All text values in Ja
 }
 
 function buildFallbackUserPrompt(imageCount: number): string {
-  return `Evaluate ${imageCount} profile photo(s) for social media effectiveness. Score each dimension and provide coaching advice in Japanese.
+  return `Evaluate ${imageCount} profile photo(s) for social media effectiveness. Score each dimension and provide detailed coaching advice in Japanese.
 
 Return exactly this JSON:
 {
@@ -60,13 +60,13 @@ Return exactly this JSON:
     "overallImpression": <int 0-15, photo effectiveness>,
     "total": <sum>
   },
-  "harshEvaluation": "<objective coaching summary in Japanese, max 200 chars>",
-  "strengths": "<what works well in the photos, in Japanese>",
-  "weaknesses": "<what to improve, in Japanese>",
-  "socialImpression": "<how others would perceive these photos, in Japanese>",
-  "improvementPriority": ["1位: <action>", "2位: <action>", "3位: <action>"],
-  "thisWeekAction": "<concrete action this week, in Japanese>",
-  "oneMonthAction": "<concrete action within a month, in Japanese>"
+  "harshEvaluation": "<detailed honest assessment in Japanese, minimum 200 characters — cover overall effectiveness, specific observations, and key improvement needed>",
+  "strengths": "<3+ specific positive points each starting with ・, explain why each works, in Japanese>",
+  "weaknesses": "<3+ specific improvement points each starting with ・, explain the problem and concrete fix, in Japanese>",
+  "socialImpression": "<detailed description of how strangers perceive these photos — first reaction, personality inferred, approachability level, minimum 150 chars, in Japanese>",
+  "improvementPriority": ["1位: <action + expected outcome>", "2位: <action + expected outcome>", "3位: <action + expected outcome>", "4位: <action + expected outcome>", "5位: <action + expected outcome>"],
+  "thisWeekAction": "<2-3 concrete step-by-step actions for this week with details on how to execute, in Japanese>",
+  "oneMonthAction": "<2-3 concrete actions for within a month with details on what to do and why, in Japanese>"
 }`;
 }
 
@@ -92,7 +92,7 @@ async function callVisionAPI(
       },
     ],
     temperature: 0.7,
-    max_tokens: 2500,
+    max_tokens: 4000,
     response_format: { type: 'json_object' },
   });
 }

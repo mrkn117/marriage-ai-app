@@ -2,16 +2,19 @@ import type { UserProfile } from '@/types';
 import { getSeason, estimateTemperature, getGenderLabel } from '@/lib/utils';
 
 export function buildDiagnosisSystemPrompt(): string {
-  return `You are a professional photo coach and first-impression consultant.
-Your task is to analyze profile photos and provide actionable feedback on how effectively they communicate the subject's personality and presence.
+  return `You are a professional photo coach and first-impression consultant with 15 years of experience coaching dating app users.
+Your task is to thoroughly analyze profile photos and provide detailed, actionable feedback on how effectively they communicate the subject's personality and presence.
 
 Focus exclusively on:
-- What the photos communicate visually (composition, lighting, expression, posture)
+- What the photos communicate visually (composition, lighting, background, framing, expression, posture)
 - Grooming and presentation quality as visible in the photo
 - Body language and confidence signals
-- How well the photos would perform as social profile images
+- How well the photos would perform as social/dating profile images
+- Specific, concrete improvements the person can make
 
 Output only valid JSON matching the schema below. No preamble or explanation.
+Be thorough and detailed in all text fields — each field should be multiple sentences with specific observations.
+Use newlines (\\n) within text fields to separate points for readability.
 
 JSON schema:
 {
@@ -24,17 +27,19 @@ JSON schema:
     "overallImpression": <integer 0-15, overall photo effectiveness>,
     "total": <sum of above>
   },
-  "harshEvaluation": "<objective analysis in Japanese, max 200 chars>",
-  "strengths": "<specific positive aspects visible in the photos, in Japanese>",
-  "weaknesses": "<specific areas for improvement, in Japanese>",
-  "socialImpression": "<how this photo set would be perceived in social contexts, in Japanese>",
+  "harshEvaluation": "<comprehensive honest assessment of the photo set in Japanese — minimum 200 characters. Cover: overall effectiveness, strongest and weakest aspects, how a stranger would react seeing these photos for the first time, specific observations about lighting/composition/expression/posture, and the single most important thing that needs to change>",
+  "strengths": "<detailed analysis of what works well — minimum 3 specific points, each on a new line starting with '・'. For each point explain WHY it works and what positive signal it sends to viewers. All in Japanese>",
+  "weaknesses": "<detailed analysis of what needs improvement — minimum 3 specific points, each on a new line starting with '・'. For each point explain the specific problem, why it hurts the photo's effectiveness, and give a concrete fix. All in Japanese>",
+  "socialImpression": "<detailed description of how a stranger would perceive this person from these photos alone — cover: first reaction (within 3 seconds), personality traits inferred from the photos, trustworthiness/approachability level, estimated social confidence, what type of person would be attracted vs. put off by these photos. Minimum 150 characters. All in Japanese>",
   "improvementPriority": [
-    "1位: <top improvement action, in Japanese>",
-    "2位: <second improvement action, in Japanese>",
-    "3位: <third improvement action, in Japanese>"
+    "1位: <most impactful improvement — state the action AND explain the expected outcome, in Japanese>",
+    "2位: <second improvement — state the action AND explain the expected outcome, in Japanese>",
+    "3位: <third improvement — state the action AND explain the expected outcome, in Japanese>",
+    "4位: <fourth improvement — state the action AND explain the expected outcome, in Japanese>",
+    "5位: <fifth improvement — state the action AND explain the expected outcome, in Japanese>"
   ],
-  "thisWeekAction": "<one concrete action achievable this week, in Japanese>",
-  "oneMonthAction": "<one concrete action achievable within a month, in Japanese>"
+  "thisWeekAction": "<specific step-by-step action plan for this week — include 2-3 concrete steps with details on HOW to execute them. All in Japanese>",
+  "oneMonthAction": "<specific action plan for within one month — include 2-3 concrete steps with details on WHAT to do and WHY it will improve the photos. All in Japanese>"
 }`;
 }
 
@@ -49,7 +54,7 @@ export function buildDiagnosisUserPrompt(
   const temp = estimateTemperature(month);
   const gender = getGenderLabel(user.gender);
 
-  return `Please analyze the following ${imageUrls.length} profile photo(s) and provide a photo coaching report.
+  return `Please analyze the following ${imageUrls.length} profile photo(s) and provide a thorough, detailed photo coaching report.
 
 Subject context:
 - Season/conditions: ${season}, approx. ${temp}°C
@@ -59,18 +64,21 @@ Subject context:
 - Region: ${user.residenceArea}
 
 Evaluation criteria (do NOT comment on clothing/fashion — separate feature handles that):
-1. First impression (20pts): Visual impact and overall presence in the photo
-2. Grooming (15pts): Hair, skin care, and presentation quality visible in photo
-3. Expression (15pts): Naturalness of smile, eye contact energy, emotional warmth
-4. Body language (20pts): Posture, stance confidence, physical ease
-5. Profile suitability (15pts): How well photos match the age group and social context
-6. Overall effectiveness (15pts): How well this photo set would work for social profiles
+1. First impression (20pts): Visual impact and immediate emotional reaction — lighting quality, background, composition, overall clarity
+2. Grooming (15pts): Hair styling, skin condition, facial hair (if applicable), overall cleanliness visible in photo
+3. Expression (15pts): Naturalness and warmth of smile, eye contact energy, genuine vs. forced expression, approachability
+4. Body language (20pts): Posture alignment, shoulder tension vs. ease, stance confidence, physical comfort in front of camera
+5. Profile suitability (15pts): How well photos match the age group, dating context, and social norms of the region
+6. Overall effectiveness (15pts): How competitive this photo set is vs. typical profiles; would it get clicks/swipes?
 
-Important:
-- Base all feedback strictly on what is visible in the photos
+Instructions for thoroughness:
+- Write detailed, multi-sentence analysis for EVERY text field
+- Be specific: mention exactly what you observe (e.g. "the lighting creates a shadow under the chin" not just "lighting is bad")
+- For improvements, give actionable steps the person can actually execute
 - ${ageNote(user)}
-- Do not comment on clothing or fashion items
-- Frame all feedback as photo coaching advice, not personal judgement
+- Base all feedback strictly on what is visible in the photos
+- Do NOT comment on clothing or fashion items
+- Frame all feedback as professional photo coaching, not personal judgement
 - All text fields must be in Japanese`;
 }
 
