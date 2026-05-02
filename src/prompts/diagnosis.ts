@@ -44,7 +44,7 @@ JSON schema:
   "harshEvaluation": "<appearance-focused assessment — minimum 250 characters. Cover: overall face attractiveness with specific feature observations, body type category, key strengths and weaknesses in appearance. For scores below 60: be blunt. All in Japanese>",
   "strengths": "<genuine appearance strengths — minimum 3 points, each starting with '・'. Specific facial features or body aspects. Explain why each creates a positive impression. All in Japanese>",
   "weaknesses": "<honest appearance weaknesses — minimum 3 points, each starting with '・'. Name exact feature/body part, describe problem clearly, give concrete fix. For scores below 60: do not soften. All in Japanese>",
-  "incomeAssessment": "<DEDICATED income and profile value section — REQUIRED. Structure exactly as follows:\\n【年収】<state income amount, tier S/A/B/C/D, comparison to age-group average, and direct assessment of how this helps or hurts on marriage apps>\\n【身長】<state height, tier, and marriage-app impact>\\n【職業】<state occupation and how it affects appeal>\\n【婚活市場での総合評価】<combined face+body+income+height overall tier: 上位/中位/下位 with explanation of what drives the rating and what type of partner is realistically attainable>\\nMinimum 300 characters. All in Japanese>",
+  "incomeAssessment": "<mandatory profile value section in Japanese — write 4 paragraphs separated by newlines: 1) income evaluation: state the exact amount, assign tier S/A/B/C/D, compare to same-age average, explain marriage-app impact. 2) height evaluation: state height, assign tier, explain impact. 3) occupation evaluation: explain appeal or disadvantage. 4) overall marriage-market tier (上位/中位/下位) combining face+body+income+height, explain what types of partners are realistically attainable. Minimum 300 characters total.>",
   "socialImpression": "<how strangers perceive this person in a dating/marriage context — cover: first-impression tier, personality signals from appearance, what kind of people would be interested, and one actionable insight. Minimum 200 characters. All in Japanese>",
   "improvementPriority": [
     "1位: <highest-impact improvement — could be appearance OR income/profile — specific action + expected result, in Japanese>",
@@ -73,23 +73,24 @@ export function buildDiagnosisUserPrompt(
   const incomeRaw = user.annualIncome > 0 ? `${user.annualIncome}万円` : '未入力';
 
   return `Evaluate this person's marriage-app value across appearance (from photos) and profile (from data).
+IMPORTANT: You must populate the "incomeAssessment" JSON field with a thorough evaluation of income, height, and occupation.
 
 === PROFILE DATA ===
 - Gender: ${gender}
 - Age: ${user.age}
 - Height: ${user.height > 0 ? `${user.height}cm` : '未入力'}
 - Weight: ${user.weight > 0 ? `${user.weight}kg` : '未入力'}${bmi ? ` (BMI ${bmi})` : ''}
-- Annual income: ${incomeRaw} (formatted: ${incomeLabel})
+- Annual income: ${incomeRaw}
 - Occupation: ${user.occupation || '未入力'}
 - Region: ${user.residenceArea || '未入力'}
 - Marriage goal: ${user.marriageGoal || '未入力'}
 - Season: ${season}, approx. ${temp}°C
 
-=== INCOME EVALUATION (required — evaluate explicitly) ===
+=== FOR incomeAssessment FIELD — write all 4 parts in Japanese ===
 ${incomeEvalInstruction(user)}
-
-=== HEIGHT EVALUATION ===
 ${heightEvalInstruction(user)}
+Occupation "${user.occupation || '未入力'}": evaluate its appeal and status in Japanese marriage-app context.
+Overall marriage-market tier: combine face+body scores with the above profile data to give a final 上位/中位/下位 verdict and explain what partners are realistically attainable.
 
 === APPEARANCE EVALUATION (from ${imageUrls.length} photo(s)) ===
 
