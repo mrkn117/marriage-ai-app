@@ -41,29 +41,32 @@ function parseJson(content: string): any {
 
 // Fallback prompt used when primary prompt triggers content filter
 function buildFallbackSystemPrompt(): string {
-  return `You are a JSON data processor. Analyze photos and return structured data.
-Output only valid JSON. No explanation needed.`;
+  return `You are a photo coaching assistant. Evaluate profile photos for social media effectiveness.
+Assess visual communication quality, grooming, expression, and body language.
+Return only valid JSON with the exact structure requested. All text values in Japanese.`;
 }
 
 function buildFallbackUserPrompt(imageCount: number): string {
-  return `Analyze ${imageCount} photo(s) of a person. Return impression analysis as JSON:
+  return `Evaluate ${imageCount} profile photo(s) for social media effectiveness. Score each dimension and provide coaching advice in Japanese.
+
+Return exactly this JSON:
 {
   "scores": {
-    "firstImpression": <int 0-20>,
-    "cleanliness": <int 0-15>,
-    "expression": <int 0-15>,
-    "postureAndBody": <int 0-20>,
-    "profileBalance": <int 0-15>,
-    "overallImpression": <int 0-15>,
+    "firstImpression": <int 0-20, visual impact>,
+    "cleanliness": <int 0-15, grooming quality>,
+    "expression": <int 0-15, expressiveness>,
+    "postureAndBody": <int 0-20, body language confidence>,
+    "profileBalance": <int 0-15, overall presentation>,
+    "overallImpression": <int 0-15, photo effectiveness>,
     "total": <sum>
   },
-  "harshEvaluation": "<200字以内の総評（日本語）>",
-  "strengths": "<良い点（日本語）>",
-  "weaknesses": "<改善点（日本語）>",
-  "socialImpression": "<対人的な印象（日本語）>",
-  "improvementPriority": ["1位: ...", "2位: ...", "3位: ..."],
-  "thisWeekAction": "<今週できる行動（日本語）>",
-  "oneMonthAction": "<1ヶ月以内の行動（日本語）>"
+  "harshEvaluation": "<objective coaching summary in Japanese, max 200 chars>",
+  "strengths": "<what works well in the photos, in Japanese>",
+  "weaknesses": "<what to improve, in Japanese>",
+  "socialImpression": "<how others would perceive these photos, in Japanese>",
+  "improvementPriority": ["1位: <action>", "2位: <action>", "3位: <action>"],
+  "thisWeekAction": "<concrete action this week, in Japanese>",
+  "oneMonthAction": "<concrete action within a month, in Japanese>"
 }`;
 }
 
@@ -139,12 +142,12 @@ async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'OpenAI APIキーが設定されていません（環境変数未設定）' }, { status: 500 });
   }
 
-  // ── 4. First OpenAI call (20s timeout) ───────────────────────────
+  // ── 4. First OpenAI call (25s timeout) ───────────────────────────
   let rawContent = '';
   let finishReason: string | null = null;
 
   try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 20_000 });
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 25_000 });
     const completion = await callVisionAPI(
       openai,
       buildDiagnosisSystemPrompt(),
@@ -153,27 +156,23 @@ async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
     );
     rawContent = completion.choices[0]?.message?.content ?? '';
     finishReason = completion.choices[0]?.finish_reason ?? null;
-    console.log('[diagnose] First attempt finish_reason:', finishReason, 'content_length:', rawContent.length);
+    console.log('[diagnose] 1st attempt finish_reason:', finishReason, 'len:', rawContent.length);
   } catch (err: any) {
     const msg = err?.message ?? '';
     const isTimeout = msg.includes('timeout') || msg.includes('timed out') || err?.status === 408;
     if (!isTimeout) {
-      console.error('[diagnose] First attempt OpenAI error:', msg);
-      return NextResponse.json(
-        { error: `AI呼び出し失敗: ${msg}` },
-        { status: 500 }
-      );
+      console.error('[diagnose] 1st attempt error:', msg);
+    } else {
+      console.warn('[diagnose] 1st attempt timed out, retrying...');
     }
-    // On timeout, fall through to retry
-    console.warn('[diagnose] First attempt timed out, retrying...');
+    // Fall through to retry on any error (timeout or content policy)
   }
 
-  // ── 5. Retry with fallback prompt if filtered/empty/timed-out ────
-  const needsRetry = finishReason === 'content_filter' || !rawContent.trim();
-  if (needsRetry) {
-    console.warn('[diagnose] Retrying with fallback prompt. finishReason:', finishReason);
+  // ── 5. Retry #1 with fallback prompt ─────────────────────────────
+  if (finishReason === 'content_filter' || !rawContent.trim()) {
+    console.warn('[diagnose] Retry #1 with fallback prompt. finishReason:', finishReason);
     try {
-      const openai2 = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 30_000 });
+      const openai2 = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 25_000 });
       const retry = await callVisionAPI(
         openai2,
         buildFallbackSystemPrompt(),
@@ -182,13 +181,32 @@ async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
       );
       rawContent = retry.choices[0]?.message?.content ?? '';
       finishReason = retry.choices[0]?.finish_reason ?? null;
-      console.log('[diagnose] Retry finish_reason:', finishReason, 'content_length:', rawContent.length);
+      console.log('[diagnose] Retry #1 finish_reason:', finishReason, 'len:', rawContent.length);
     } catch (retryErr: any) {
-      console.error('[diagnose] Retry also failed:', retryErr?.message);
+      console.error('[diagnose] Retry #1 failed:', retryErr?.message);
+    }
+  }
+
+  // ── 5b. Retry #2 — minimal prompt, single image ──────────────────
+  if (finishReason === 'content_filter' || !rawContent.trim()) {
+    console.warn('[diagnose] Retry #2 with minimal prompt.');
+    try {
+      const openai3 = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 25_000 });
+      const retry2 = await callVisionAPI(
+        openai3,
+        'Return only valid JSON. No explanation.',
+        `Rate these ${validUrls.length} photos for profile photo quality (1-10 each dimension). All text in Japanese.\n{"scores":{"firstImpression":<0-20>,"cleanliness":<0-15>,"expression":<0-15>,"postureAndBody":<0-20>,"profileBalance":<0-15>,"overallImpression":<0-15>,"total":<sum>},"harshEvaluation":"<日本語で総評>","strengths":"<良い点>","weaknesses":"<改善点>","socialImpression":"<印象>","improvementPriority":["1位:","2位:","3位:"],"thisWeekAction":"<行動>","oneMonthAction":"<行動>"}`,
+        validUrls.slice(0, 1), // send only first image to reduce filter chance
+      );
+      rawContent = retry2.choices[0]?.message?.content ?? '';
+      finishReason = retry2.choices[0]?.finish_reason ?? null;
+      console.log('[diagnose] Retry #2 finish_reason:', finishReason, 'len:', rawContent.length);
+    } catch (retryErr: any) {
+      console.error('[diagnose] Retry #2 failed:', retryErr?.message);
       const msg = retryErr?.message ?? '';
       const isTimeout = msg.includes('timeout') || msg.includes('timed out');
       return NextResponse.json(
-        { error: isTimeout ? 'AIの応答がタイムアウトしました。再度お試しください。' : '写真の処理に失敗しました。明るい場所・単色背景で撮り直してください。' },
+        { error: isTimeout ? 'AIの応答がタイムアウトしました。再度お試しください。' : 'AI分析に失敗しました。時間をおいて再度お試しください。' },
         { status: 500 }
       );
     }
@@ -197,7 +215,7 @@ async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
   // ── 6. Final check on response ────────────────────────────────────
   if (finishReason === 'content_filter') {
     return NextResponse.json(
-      { error: '写真の処理を完了できませんでした。正面向き・明るい場所・白や灰色の背景で撮り直してください。' },
+      { error: 'AI分析の処理でエラーが発生しました。写真の枚数を減らすか、時間をおいて再度お試しください。' },
       { status: 422 }
     );
   }

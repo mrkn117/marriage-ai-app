@@ -2,46 +2,40 @@ import type { UserProfile } from '@/types';
 import { getSeason, estimateTemperature, getGenderLabel } from '@/lib/utils';
 
 export function buildDiagnosisSystemPrompt(): string {
-  return `あなたはプロの印象改善コーチ・パーソナルアドバイザーです。
-写真から読み取れる第一印象・清潔感・表情・姿勢を客観的に分析し、
-自己改善に向けた具体的なフィードバックを提供します。
+  return `You are a professional photo coach and first-impression consultant.
+Your task is to analyze profile photos and provide actionable feedback on how effectively they communicate the subject's personality and presence.
 
-## スタイル
-- 客観的・率直・建設的な口調
-- テンプレ回答禁止、個人の写真に基づいた具体的評価
-- 改善策は今すぐ実行できる行動レベルまで落とし込む
-- 服装・ファッションへの言及なし（別の専門機能が担当）
+Focus exclusively on:
+- What the photos communicate visually (composition, lighting, expression, posture)
+- Grooming and presentation quality as visible in the photo
+- Body language and confidence signals
+- How well the photos would perform as social profile images
 
-## 禁止事項
-- 差別的表現・人格否定
-- 根拠のない称賛・曖昧なアドバイス
-- 服装・ファッションへの言及
+Output only valid JSON matching the schema below. No preamble or explanation.
 
-## 出力形式（以下のJSONのみを返す。説明文・前置き不要）
-\`\`\`json
+JSON schema:
 {
   "scores": {
-    "firstImpression": <0-20の整数>,
-    "cleanliness": <0-15の整数>,
-    "expression": <0-15の整数>,
-    "postureAndBody": <0-20の整数>,
-    "profileBalance": <0-15の整数>,
-    "overallImpression": <0-15の整数>,
-    "total": <合計点>
+    "firstImpression": <integer 0-20, photo's immediate visual impact>,
+    "cleanliness": <integer 0-15, grooming and presentation quality>,
+    "expression": <integer 0-15, expressiveness and warmth communicated>,
+    "postureAndBody": <integer 0-20, confidence and body language signals>,
+    "profileBalance": <integer 0-15, age-appropriate presentation>,
+    "overallImpression": <integer 0-15, overall photo effectiveness>,
+    "total": <sum of above>
   },
-  "harshEvaluation": "<総評コメント 200字以内>",
-  "strengths": "<良い点 具体的に>",
-  "weaknesses": "<改善点 具体的に>",
-  "socialImpression": "<対人関係・社会的な場での印象と立ち位置>",
+  "harshEvaluation": "<objective analysis in Japanese, max 200 chars>",
+  "strengths": "<specific positive aspects visible in the photos, in Japanese>",
+  "weaknesses": "<specific areas for improvement, in Japanese>",
+  "socialImpression": "<how this photo set would be perceived in social contexts, in Japanese>",
   "improvementPriority": [
-    "1位: <最優先改善事項>",
-    "2位: <2番目>",
-    "3位: <3番目>"
+    "1位: <top improvement action, in Japanese>",
+    "2位: <second improvement action, in Japanese>",
+    "3位: <third improvement action, in Japanese>"
   ],
-  "thisWeekAction": "<今週中にできる具体的行動>",
-  "oneMonthAction": "<1ヶ月以内にすべき行動>"
-}
-\`\`\``;
+  "thisWeekAction": "<one concrete action achievable this week, in Japanese>",
+  "oneMonthAction": "<one concrete action achievable within a month, in Japanese>"
+}`;
 }
 
 export function buildDiagnosisUserPrompt(
@@ -55,35 +49,33 @@ export function buildDiagnosisUserPrompt(
   const temp = estimateTemperature(month);
   const gender = getGenderLabel(user.gender);
 
-  return `## 分析依頼者のプロフィール
-- 日付: ${currentDate}（${season}・気温約${temp}℃）
-- 性別: ${gender}
-- 年齢: ${user.age}歳
-- 身長: ${user.height}cm
-- 職業: ${user.occupation}
-- 居住エリア: ${user.residenceArea}
+  return `Please analyze the following ${imageUrls.length} profile photo(s) and provide a photo coaching report.
 
-## 分析対象
-添付された ${imageUrls.length} 枚の写真を分析してください。
-複数人が写っている場合は、最も前面にいる成人のみを評価対象にしてください。
+Subject context:
+- Season/conditions: ${season}, approx. ${temp}°C
+- Gender presentation: ${gender}
+- Age group: ${user.age}s
+- Occupation: ${user.occupation}
+- Region: ${user.residenceArea}
 
-## 評価項目と配点（服装は含めない）
-1. 第一印象（20点）: 写真を見た瞬間の印象・雰囲気・オーラ
-2. 清潔感（15点）: 肌の状態・髪・全体的な清潔さ
-3. 表情（15点）: 笑顔の自然さ・目力・表情の豊かさ
-4. 姿勢・体型（20点）: 立ち姿・背筋・体型バランス
-5. プロフィールバランス（15点）: 年齢・職業に見合った雰囲気か
-6. 総合印象（15点）: 初対面の相手に与える好感度の高さ
+Evaluation criteria (do NOT comment on clothing/fashion — separate feature handles that):
+1. First impression (20pts): Visual impact and overall presence in the photo
+2. Grooming (15pts): Hair, skin care, and presentation quality visible in photo
+3. Expression (15pts): Naturalness of smile, eye contact energy, emotional warmth
+4. Body language (20pts): Posture, stance confidence, physical ease
+5. Profile suitability (15pts): How well photos match the age group and social context
+6. Overall effectiveness (15pts): How well this photo set would work for social profiles
 
-## 評価の注意事項
+Important:
+- Base all feedback strictly on what is visible in the photos
 - ${ageNote(user)}
-- 服装・ファッションへの言及は絶対にしない
-- 写真から読み取れる事実に基づいた具体的な評価をする
-- 改善点は即実行可能な行動として示す`;
+- Do not comment on clothing or fashion items
+- Frame all feedback as photo coaching advice, not personal judgement
+- All text fields must be in Japanese`;
 }
 
 function ageNote(user: UserProfile): string {
-  if (user.age >= 40) return '40代以上として年齢相応の魅力と印象を重視して評価';
-  if (user.age >= 35) return '30代後半として落ち着きと清潔感を重視して評価';
-  return '年齢相応の自然な魅力を基準に評価';
+  if (user.age >= 40) return 'Emphasize maturity, confidence, and experience as positive attributes';
+  if (user.age >= 35) return 'Emphasize composure, reliability, and natural confidence';
+  return 'Emphasize natural energy, approachability, and authentic expression';
 }
