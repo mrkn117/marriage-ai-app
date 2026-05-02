@@ -41,33 +41,30 @@ function parseJson(content: string): any {
 
 // Fallback prompt used when primary prompt triggers content filter
 function buildFallbackSystemPrompt(): string {
-  return `You are a brutally honest dating profile coach. Evaluate the face and body physique visible in profile photos.
-Focus only on: facial features (attractiveness, skin, jawline, eyes), body shape, and posture.
-For total scores below 60: be blunt and direct. Do not soften criticism.
-Return only valid JSON with the exact structure requested. All text values in Japanese.`;
+  return `You are a brutally honest dating profile coach. Evaluate ONLY facial attractiveness (顔立ち) and body type (体型) from photos. Do NOT score posture — give posture as advice only. For total scores below 60: be blunt and direct. Return only valid JSON. All text values in Japanese.`;
 }
 
 function buildFallbackUserPrompt(imageCount: number): string {
-  return `Evaluate the face and body physique in ${imageCount} profile photo(s). Score each dimension and provide detailed honest feedback in Japanese. If total score is below 60, write harsh blunt criticism.
+  return `Evaluate facial attractiveness and body type in ${imageCount} profile photo(s). Score face and body only. Give posture as advice, not a score. If total score is below 60, write harsh blunt criticism in Japanese.
 
 Return exactly this JSON:
 {
   "scores": {
-    "firstImpression": <int 0-20, facial attractiveness and visual impact>,
-    "cleanliness": <int 0-15, skin condition and grooming>,
-    "expression": <int 0-15, facial expression and eye contact>,
-    "postureAndBody": <int 0-20, body shape physique and posture>,
-    "profileBalance": <int 0-15, overall photogenic quality>,
-    "overallImpression": <int 0-15, total attractiveness as others rate it>,
+    "firstImpression": <int 0-20, facial attractiveness and first-glance impact>,
+    "cleanliness": <int 0-15, skin condition and facial grooming>,
+    "expression": <int 0-15, eyes and facial expression quality>,
+    "postureAndBody": <int 0-20, body type and physique ONLY — shape, muscle tone, NOT posture>,
+    "profileBalance": <int 0-15, facial symmetry and photogenic quality>,
+    "overallImpression": <int 0-15, total attractiveness as others honestly rate it>,
     "total": <sum>
   },
-  "harshEvaluation": "<comprehensive face+body assessment in Japanese, minimum 250 characters — specific about facial features, body shape, and key improvement needed. Blunt if score below 60>",
-  "strengths": "<3+ specific positive points each starting with ・, name exact facial features or body aspects that are attractive and why, in Japanese>",
-  "weaknesses": "<3+ specific negative points each starting with ・, name exact feature/body part, describe the problem, give concrete fix. Blunt if score below 60, in Japanese>",
-  "socialImpression": "<honest assessment of attractiveness tier and dating app prospects based on face and body — minimum 200 chars, in Japanese>",
-  "improvementPriority": ["1位: <action + expected result>", "2位: <action + expected result>", "3位: <action + expected result>", "4位: <action + expected result>", "5位: <action + expected result>"],
-  "thisWeekAction": "<2-3 concrete steps this week to improve face/body appearance, in Japanese>",
-  "oneMonthAction": "<2-3 concrete steps within a month for physical improvement with expected outcome, in Japanese>"
+  "harshEvaluation": "<comprehensive face+body type assessment, minimum 250 chars — specific facial features, body type category, key issues. Blunt if score below 60. In Japanese>",
+  "strengths": "<3+ points starting with ・, name exact facial features or body aspects that are attractive and why, in Japanese>",
+  "weaknesses": "<3+ points starting with ・, name exact feature/body part, describe problem, give concrete fix. Blunt if score below 60, in Japanese>",
+  "socialImpression": "<honest attractiveness tier and dating app prospects based on face and body — minimum 200 chars, in Japanese>",
+  "improvementPriority": ["1位: <face/body action + result>", "2位: <face/body action + result>", "3位: <face/body action + result>", "4位: <posture correction advice + expected effect>", "5位: <face/body action + result>"],
+  "thisWeekAction": "<2-3 steps this week including at least one posture tip, in Japanese>",
+  "oneMonthAction": "<2-3 steps within a month for face/body improvement with expected outcome, in Japanese>"
 }`;
 }
 
