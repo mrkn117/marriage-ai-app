@@ -32,7 +32,7 @@ const scoreItems = [
   { key: 'expression', label: '表情', max: 15 },
   { key: 'postureAndBody', label: '姿勢・体型', max: 20 },
   { key: 'profileBalance', label: '基本情報バランス', max: 15 },
-  { key: 'marketValue', label: '婚活市場評価', max: 15 },
+  { key: 'overallImpression', label: '総合印象', max: 15 },
 ] as const;
 
 function DiagnosisContent() {
@@ -182,7 +182,7 @@ function DiagnosisContent() {
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-red-300 font-bold text-sm mb-1">辛口評価</p>
+                    <p className="text-red-300 font-bold text-sm mb-1">総評</p>
                     <p className="text-white/80 text-sm leading-relaxed whitespace-pre-line">
                       {result.harshEvaluation}
                     </p>
@@ -264,10 +264,10 @@ function DiagnosisContent() {
             <Card variant="glass" className="mb-6">
               <div className="flex items-center gap-2 mb-3">
                 <TrendingUp className="w-5 h-5 text-blue-400" />
-                <h3 className="text-white font-semibold">婚活市場での見え方</h3>
+                <h3 className="text-white font-semibold">対人的な印象</h3>
               </div>
               <p className="text-white/70 text-sm leading-relaxed whitespace-pre-line">
-                {result.marketView}
+                {result.socialImpression}
               </p>
             </Card>
           </motion.div>
@@ -284,7 +284,7 @@ function DiagnosisContent() {
                 <h3 className="text-white font-semibold">改善優先順位</h3>
               </div>
               <div className="space-y-3">
-                {result.improvementPriority.map((item, i) => (
+                {(Array.isArray(result.improvementPriority) ? result.improvementPriority : []).map((item, i) => (
                   <div key={i} className="flex items-start gap-3">
                     <div className={cn(
                       'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold',

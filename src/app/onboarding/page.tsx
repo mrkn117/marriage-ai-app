@@ -94,6 +94,9 @@ export default function OnboardingPage() {
     resolver: zodResolver(schema),
     defaultValues: {
       gender: 'male',
+      age: 25,
+      height: 170,
+      weight: 65,
       dateTimeSlot: 'dinner',
       fashionPreference: 'cost-effective',
       fashionBudget: 20000,

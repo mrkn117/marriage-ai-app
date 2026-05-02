@@ -20,7 +20,11 @@ export default function AdminPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!user?.email) return;
+    if (!user?.email) {
+      setLoading(false);
+      setError('管理者権限が必要です');
+      return;
+    }
     const email = user.email;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20_000);

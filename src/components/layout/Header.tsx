@@ -94,7 +94,9 @@ export function Header() {
               </button>
 
               {profileOpen && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-dark-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} aria-hidden="true" />
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-dark-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
                   <div className="p-3 border-b border-white/5">
                     <p className="text-white text-sm font-medium truncate">
                       {userProfile?.nickname ?? 'ユーザー'}
@@ -129,6 +131,7 @@ export function Header() {
                     </button>
                   </div>
                 </div>
+                </>
               )}
             </div>
 

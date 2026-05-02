@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   MapPin,
@@ -44,6 +44,8 @@ export default function DatePlanPage() {
   const [partnerDesc, setPartnerDesc] = useState('');
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<DatePlan | null>(currentDatePlan);
+  const fetchAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => { return () => { fetchAbortRef.current?.abort(); }; }, []);
   const [copied, setCopied] = useState(false);
   const [expandedSchedule, setExpandedSchedule] = useState<number | null>(0);
 
@@ -56,8 +58,14 @@ export default function DatePlanPage() {
       toast.error('デートエリアを入力してください');
       return;
     }
+    const budgetNum = Number(budget);
+    if (!budget.trim() || !isFinite(budgetNum) || budgetNum < 0) {
+      toast.error('予算を正しく入力してください');
+      return;
+    }
     setGenerating(true);
     const controller = new AbortController();
+    fetchAbortRef.current = controller;
     const abortTimer = setTimeout(() => controller.abort(), 62_000);
     try {
       let response: Response;
@@ -68,7 +76,7 @@ export default function DatePlanPage() {
           body: JSON.stringify({
             userProfile: { ...userProfile, uid: user?.uid ?? '' },
             area,
-            budget: Number(budget),
+            budget: budgetNum,
             timeSlot,
             isFirstDate,
             partnerDescription: partnerDesc || '特に指定なし',

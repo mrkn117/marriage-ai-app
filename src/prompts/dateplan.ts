@@ -2,8 +2,8 @@ import type { UserProfile } from '@/types';
 import { getGenderLabel, formatCurrency, getTimeSlotLabel } from '@/lib/utils';
 
 export function buildDatePlanSystemPrompt(): string {
-  return `あなたは恋愛・婚活専門のデートプランナーです。
-実際の店舗・スポット情報をベースに、成功率を高めるデートプランを提案します。
+  return `あなたはプロのデートプランナーです。
+実際の店舗・スポット情報をベースに、相手に喜ばれるデートプランを提案します。
 
 ## ルール
 - 実在する店舗・スポットを使ったリアルなプランを作成
@@ -78,8 +78,8 @@ ${partnerDescription}
 }
 
 export function buildProfileSystemPrompt(): string {
-  return `あなたは婚活プロフィールの専門ライターです。
-マッチングアプリ・婚活サービスで高反応を得られるプロフィールを作成します。
+  return `あなたはプロのプロフィールライターです。
+マッチングアプリで好印象を与える自己紹介文を作成します。
 
 ## ルール
 - 嘘は書かない（事実ベース）

@@ -132,11 +132,15 @@ async function handleProfile(req: NextRequest): Promise<NextResponse> {
     userId: userProfile.uid ?? '',
     title: String(parsed.title ?? ''),
     selfIntroduction: String(parsed.selfIntroduction ?? ''),
-    appealPoints: Array.isArray(parsed.appealPoints) ? parsed.appealPoints : [],
+    appealPoints: Array.isArray(parsed.appealPoints)
+      ? parsed.appealPoints.map((p: any) => String(p ?? ''))
+      : [],
     hobbyDescription: String(parsed.hobbyDescription ?? ''),
     partnerPreference: String(parsed.partnerPreference ?? ''),
     messageToSend: String(parsed.messageToSend ?? ''),
-    profilePhotoTips: Array.isArray(parsed.profilePhotoTips) ? parsed.profilePhotoTips : [],
+    profilePhotoTips: Array.isArray(parsed.profilePhotoTips)
+      ? parsed.profilePhotoTips.map((t: any) => String(t ?? ''))
+      : [],
     createdAt: new Date(),
   };
 

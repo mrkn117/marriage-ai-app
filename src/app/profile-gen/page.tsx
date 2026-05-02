@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   UserCircle,
@@ -24,6 +24,8 @@ export default function ProfileGenPage() {
   const [generating, setGenerating] = useState(false);
   const [profile, setProfile] = useState<GeneratedProfile | null>(null);
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
+  const fetchAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => { return () => { fetchAbortRef.current?.abort(); }; }, []);
 
   const handleGenerate = async () => {
     if (!userProfile?.age) {
@@ -32,6 +34,7 @@ export default function ProfileGenPage() {
     }
     setGenerating(true);
     const controller = new AbortController();
+    fetchAbortRef.current = controller;
     const abortTimer = setTimeout(() => controller.abort(), 62_000);
     try {
       let response: Response;

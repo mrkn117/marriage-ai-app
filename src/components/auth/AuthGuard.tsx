@@ -37,8 +37,8 @@ export function AuthGuard({ children, requireProfile = false }: AuthGuardProps) 
 
   if (loading) return <LoadingScreen />;
 
-  // Show loading during redirect instead of blank screen
-  if (requireProfile && (!userProfile?.age)) return <LoadingScreen />;
+  // Show loading while redirect to /onboarding fires (user exists but profile incomplete)
+  if (requireProfile && user && !userProfile?.age) return <LoadingScreen />;
 
   return <>{children}</>;
 }

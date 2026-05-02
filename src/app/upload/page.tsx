@@ -52,7 +52,7 @@ const photoRules = {
     '顔写真：正面向き・胸から上・顔が画面の半分以上',
     '全身写真：壁の前にまっすぐ立ち・頭から足まで入れる',
     '加工なし・ありのままの状態',
-    'JPEG・PNG・WebP形式（10MB以下）',
+    'JPEG・PNG・WebP形式（10MB以下）※HEICは非対応（iPhoneは設定→カメラ→フォーマット→互換性優先に変更）',
   ],
   places: [
     '自宅の白壁の前（最も安定・AI判定精度が高い）',
@@ -80,13 +80,15 @@ export default function UploadPage() {
   const [diagnosing, setDiagnosing] = useState(false);
   const slotsRef = useRef(slots);
   slotsRef.current = slots;
+  const diagnoseAbortRef = useRef<AbortController | null>(null);
 
-  // Revoke all ObjectURLs on unmount to prevent memory leaks
+  // Cleanup on unmount: revoke ObjectURLs and abort any in-flight diagnosis
   useEffect(() => {
     return () => {
       Object.values(slotsRef.current).forEach((s) => {
         if (s?.preview) URL.revokeObjectURL(s.preview);
       });
+      diagnoseAbortRef.current?.abort();
     };
   }, []);
 
@@ -154,6 +156,7 @@ export default function UploadPage() {
 
     setDiagnosing(true);
     const controller = new AbortController();
+    diagnoseAbortRef.current = controller;
     const abortTimer = setTimeout(() => controller.abort(), 62_000);
     try {
       const imageUrls = Object.values(slots)
@@ -161,10 +164,10 @@ export default function UploadPage() {
         .map((s) => s!.url!);
 
       const totalBytes = imageUrls.reduce((sum, url) => sum + url.length, 0);
-      if (totalBytes > 400_000) {
+      if (totalBytes > 600_000) {
         throw new Error(
           `画像データが大きすぎます（${Math.round(totalBytes / 1024)}KB）。` +
-          '写真を撮り直すか、別の写真をお試しください。'
+          '写真を撮り直すか、枚数を減らしてお試しください。'
         );
       }
 
@@ -384,7 +387,7 @@ export default function UploadPage() {
               <div className="space-y-1.5 text-sm text-white/40">
                 <p>・顔まわりの印象を解析中</p>
                 <p>・清潔感・姿勢・体型を評価中</p>
-                <p>・婚活市場での競争力を算出中</p>
+                <p>・初対面の好感度・総合印象を算出中</p>
                 <p>・個別改善提案を生成中</p>
               </div>
             </div>
@@ -414,7 +417,11 @@ function DropZoneSlot({ slot, slotData, onDrop, onRemove }: DropZoneSlotProps) {
       else if (isWrongType) toast.error('JPEG・PNG・WebP形式の画像を選択してください');
       else toast.error('この画像は使用できません');
     },
-    accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.heic'] },
+    accept: {
+        'image/jpeg': ['.jpg', '.jpeg'],
+        'image/png': ['.png'],
+        'image/webp': ['.webp'],
+      },
     maxFiles: 1,
     maxSize: 10 * 1024 * 1024,
     disabled: !!slotData?.uploaded,

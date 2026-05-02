@@ -26,13 +26,13 @@ export function buildDiagnosisSystemPrompt(): string {
     "expression": <0-15の整数>,
     "postureAndBody": <0-20の整数>,
     "profileBalance": <0-15の整数>,
-    "marketValue": <0-15の整数>,
+    "overallImpression": <0-15の整数>,
     "total": <合計点>
   },
   "harshEvaluation": "<総評コメント 200字以内>",
   "strengths": "<良い点 具体的に>",
   "weaknesses": "<改善点 具体的に>",
-  "marketView": "<対人関係・社会的な場での印象と立ち位置>",
+  "socialImpression": "<対人関係・社会的な場での印象と立ち位置>",
   "improvementPriority": [
     "1位: <最優先改善事項>",
     "2位: <2番目>",

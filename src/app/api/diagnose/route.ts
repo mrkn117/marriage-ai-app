@@ -54,13 +54,13 @@ function buildFallbackUserPrompt(imageCount: number): string {
     "expression": <int 0-15>,
     "postureAndBody": <int 0-20>,
     "profileBalance": <int 0-15>,
-    "marketValue": <int 0-15>,
+    "overallImpression": <int 0-15>,
     "total": <sum>
   },
   "harshEvaluation": "<200字以内の総評（日本語）>",
   "strengths": "<良い点（日本語）>",
   "weaknesses": "<改善点（日本語）>",
-  "marketView": "<対人的な印象（日本語）>",
+  "socialImpression": "<対人的な印象（日本語）>",
   "improvementPriority": ["1位: ...", "2位: ...", "3位: ..."],
   "thisWeekAction": "<今週できる行動（日本語）>",
   "oneMonthAction": "<1ヶ月以内の行動（日本語）>"
@@ -89,7 +89,7 @@ async function callVisionAPI(
       },
     ],
     temperature: 0.7,
-    max_tokens: 2000,
+    max_tokens: 2500,
     response_format: { type: 'json_object' },
   });
 }
@@ -228,12 +228,12 @@ async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
     expression:      Math.min(15, Math.max(0, Number(parsed.scores?.expression)      || 8)),
     postureAndBody:  Math.min(20, Math.max(0, Number(parsed.scores?.postureAndBody)  || 10)),
     profileBalance:  Math.min(15, Math.max(0, Number(parsed.scores?.profileBalance)  || 8)),
-    marketValue:     Math.min(15, Math.max(0, Number(parsed.scores?.marketValue)     || 8)),
+    overallImpression: Math.min(15, Math.max(0, Number(parsed.scores?.overallImpression) || 8)),
     total: 0,
   };
   scores.total =
     scores.firstImpression + scores.cleanliness + scores.expression +
-    scores.postureAndBody + scores.profileBalance + scores.marketValue;
+    scores.postureAndBody + scores.profileBalance + scores.overallImpression;
 
   const diagnosisData: Omit<DiagnosisResult, 'id'> = {
     userId: userProfile.uid ?? '',
@@ -241,7 +241,7 @@ async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
     harshEvaluation: String(parsed.harshEvaluation ?? ''),
     strengths:       String(parsed.strengths       ?? ''),
     weaknesses:      String(parsed.weaknesses      ?? ''),
-    marketView:      String(parsed.marketView      ?? ''),
+    socialImpression: String(parsed.socialImpression ?? ''),
     improvementPriority: Array.isArray(parsed.improvementPriority)
       ? parsed.improvementPriority.map(String)
       : [],
@@ -265,5 +265,5 @@ async function handleDiagnose(req: NextRequest): Promise<NextResponse> {
     console.error('[diagnose] Firestore save failed (non-fatal):', err?.message);
   }
 
-  return NextResponse.json({ id, ...diagnosisData, imageUrls: validUrls });
+  return NextResponse.json({ id, ...diagnosisData });
 }

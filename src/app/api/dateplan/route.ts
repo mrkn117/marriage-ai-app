@@ -114,9 +114,20 @@ async function handleDatePlan(req: NextRequest): Promise<NextResponse> {
     timeSlot,
     isFirstDate,
     partnerType: partnerDescription,
-    schedule: Array.isArray(parsed.schedule) ? parsed.schedule : [],
+    schedule: Array.isArray(parsed.schedule)
+      ? parsed.schedule.map((item: any) => ({
+          time:     String(item?.time     ?? ''),
+          venue:    String(item?.venue    ?? ''),
+          activity: String(item?.activity ?? ''),
+          budget:   Number(item?.budget)  || 0,
+          address:  String(item?.address  ?? ''),
+          tips:     String(item?.tips     ?? ''),
+        }))
+      : [],
     conversationFlow: String(parsed.conversationFlow ?? ''),
-    ngActions: Array.isArray(parsed.ngActions) ? parsed.ngActions : [],
+    ngActions: Array.isArray(parsed.ngActions)
+      ? parsed.ngActions.map((ng: any) => String(ng ?? ''))
+      : [],
     invitePhrase: String(parsed.invitePhrase ?? ''),
     rainyDayAlternative: String(parsed.rainyDayAlternative ?? ''),
     createdAt: new Date(),

@@ -122,13 +122,13 @@ export default function HistoryPage() {
                               <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="10" />
                               <circle
                                 cx="50" cy="50" r="42" fill="none"
-                                stroke="url(#histGrad)" strokeWidth="10"
+                                stroke={`url(#histGrad-${i})`} strokeWidth="10"
                                 strokeLinecap="round"
                                 strokeDasharray="264"
                                 strokeDashoffset={264 - (264 * d.scores.total / 100)}
                               />
                               <defs>
-                                <linearGradient id="histGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <linearGradient id={`histGrad-${i}`} x1="0%" y1="0%" x2="100%" y2="0%">
                                   <stop offset="0%" stopColor="#ec4899" />
                                   <stop offset="100%" stopColor="#a855f7" />
                                 </linearGradient>

@@ -225,7 +225,7 @@ export default function DashboardPage() {
                     { label: '表情', score: latestDiagnosis.scores.expression, max: 15 },
                     { label: '姿勢・体型', score: latestDiagnosis.scores.postureAndBody, max: 20 },
                     { label: '基本情報', score: latestDiagnosis.scores.profileBalance, max: 15 },
-                    { label: '市場評価', score: latestDiagnosis.scores.marketValue, max: 15 },
+                    { label: '総合印象', score: latestDiagnosis.scores.overallImpression, max: 15 },
                   ].map((item) => (
                     <div key={item.label} className="text-center">
                       <div className="text-white font-bold text-lg">{item.score}</div>

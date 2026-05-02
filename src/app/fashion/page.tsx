@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Shirt,
@@ -79,6 +79,8 @@ export default function FashionPage() {
   const [temperature, setTemperature] = useState(String(defaultTemp));
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<FashionSuggestion | null>(currentFashion);
+  const fetchAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => { return () => { fetchAbortRef.current?.abort(); }; }, []);
   const [activePlan, setActivePlan] = useState<'high-brand' | 'cost-effective' | 'budget'>(
     userProfile?.fashionPreference ?? 'cost-effective'
   );
@@ -89,8 +91,14 @@ export default function FashionPage() {
       toast.error('プロフィールを設定してください');
       return;
     }
+    const tempNum = Number(temperature);
+    if (!temperature.trim() || !isFinite(tempNum)) {
+      toast.error('気温を正しく入力してください');
+      return;
+    }
     setGenerating(true);
     const controller = new AbortController();
+    fetchAbortRef.current = controller;
     const abortTimer = setTimeout(() => controller.abort(), 62_000);
     try {
       const season = getSeason(now.getMonth() + 1);
@@ -103,7 +111,7 @@ export default function FashionPage() {
             userProfile: { ...userProfile, uid: user?.uid ?? '' },
             currentDate: now.toISOString().split('T')[0],
             season,
-            temperature: Number(temperature),
+            temperature: tempNum,
             weather,
             dateType,
           }),

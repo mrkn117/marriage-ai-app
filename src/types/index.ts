@@ -35,7 +35,7 @@ export interface DiagnosisScores {
   expression: number;        // 15点
   postureAndBody: number;    // 20点
   profileBalance: number;    // 15点
-  marketValue: number;       // 15点
+  overallImpression: number; // 15点
   total: number;             // 100点
 }
 
@@ -46,7 +46,7 @@ export interface DiagnosisResult {
   harshEvaluation: string;
   strengths: string;
   weaknesses: string;
-  marketView: string;
+  socialImpression: string;
   improvementPriority: string[];
   thisWeekAction: string;
   oneMonthAction: string;
