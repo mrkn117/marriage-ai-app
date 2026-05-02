@@ -41,32 +41,33 @@ function parseJson(content: string): any {
 
 // Fallback prompt used when primary prompt triggers content filter
 function buildFallbackSystemPrompt(): string {
-  return `You are a photo coaching assistant. Evaluate profile photos for social media effectiveness.
-Assess visual communication quality, grooming, expression, and body language.
+  return `You are a brutally honest dating profile coach. Evaluate the face and body physique visible in profile photos.
+Focus only on: facial features (attractiveness, skin, jawline, eyes), body shape, and posture.
+For total scores below 60: be blunt and direct. Do not soften criticism.
 Return only valid JSON with the exact structure requested. All text values in Japanese.`;
 }
 
 function buildFallbackUserPrompt(imageCount: number): string {
-  return `Evaluate ${imageCount} profile photo(s) for social media effectiveness. Score each dimension and provide detailed coaching advice in Japanese.
+  return `Evaluate the face and body physique in ${imageCount} profile photo(s). Score each dimension and provide detailed honest feedback in Japanese. If total score is below 60, write harsh blunt criticism.
 
 Return exactly this JSON:
 {
   "scores": {
-    "firstImpression": <int 0-20, visual impact>,
-    "cleanliness": <int 0-15, grooming quality>,
-    "expression": <int 0-15, expressiveness>,
-    "postureAndBody": <int 0-20, body language confidence>,
-    "profileBalance": <int 0-15, overall presentation>,
-    "overallImpression": <int 0-15, photo effectiveness>,
+    "firstImpression": <int 0-20, facial attractiveness and visual impact>,
+    "cleanliness": <int 0-15, skin condition and grooming>,
+    "expression": <int 0-15, facial expression and eye contact>,
+    "postureAndBody": <int 0-20, body shape physique and posture>,
+    "profileBalance": <int 0-15, overall photogenic quality>,
+    "overallImpression": <int 0-15, total attractiveness as others rate it>,
     "total": <sum>
   },
-  "harshEvaluation": "<detailed honest assessment in Japanese, minimum 200 characters — cover overall effectiveness, specific observations, and key improvement needed>",
-  "strengths": "<3+ specific positive points each starting with ・, explain why each works, in Japanese>",
-  "weaknesses": "<3+ specific improvement points each starting with ・, explain the problem and concrete fix, in Japanese>",
-  "socialImpression": "<detailed description of how strangers perceive these photos — first reaction, personality inferred, approachability level, minimum 150 chars, in Japanese>",
-  "improvementPriority": ["1位: <action + expected outcome>", "2位: <action + expected outcome>", "3位: <action + expected outcome>", "4位: <action + expected outcome>", "5位: <action + expected outcome>"],
-  "thisWeekAction": "<2-3 concrete step-by-step actions for this week with details on how to execute, in Japanese>",
-  "oneMonthAction": "<2-3 concrete actions for within a month with details on what to do and why, in Japanese>"
+  "harshEvaluation": "<comprehensive face+body assessment in Japanese, minimum 250 characters — specific about facial features, body shape, and key improvement needed. Blunt if score below 60>",
+  "strengths": "<3+ specific positive points each starting with ・, name exact facial features or body aspects that are attractive and why, in Japanese>",
+  "weaknesses": "<3+ specific negative points each starting with ・, name exact feature/body part, describe the problem, give concrete fix. Blunt if score below 60, in Japanese>",
+  "socialImpression": "<honest assessment of attractiveness tier and dating app prospects based on face and body — minimum 200 chars, in Japanese>",
+  "improvementPriority": ["1位: <action + expected result>", "2位: <action + expected result>", "3位: <action + expected result>", "4位: <action + expected result>", "5位: <action + expected result>"],
+  "thisWeekAction": "<2-3 concrete steps this week to improve face/body appearance, in Japanese>",
+  "oneMonthAction": "<2-3 concrete steps within a month for physical improvement with expected outcome, in Japanese>"
 }`;
 }
 
